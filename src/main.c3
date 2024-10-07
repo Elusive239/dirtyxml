@@ -1,4 +1,3 @@
-module xml_test;
 import std::io;
 import xml;
 
