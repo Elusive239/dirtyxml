@@ -45,11 +45,12 @@ fn void XMLDocument.free(&self){
 }
 
 fn void XMLNode.free(&self){
+   
     self.attributes.free();
     self.children.free();
-    if(self.tag != null) free(self.tag);
-    if(self.inner_text != null) free(self.inner_text);
-    free(self);
+    if(self.tag != null && self.tag.len() > 0) free(self.tag);
+    if(self.inner_text != null  && self.inner_text.len() > 0) free(self.inner_text);
+    // free(self);
 }
 
 
@@ -67,7 +68,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     int lexi = 0;
     int i = 0;
 
-    XMLNode* current;
+    XMLNode* current = doc.root;
     while(i < file.len){
         if(file[i] == '<'){
             lex[lexi] = '\0';
@@ -99,22 +100,15 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 }
                 current = current.parent;
                 i++;
-                // io::printfn("lex contents: %s", lex[0..lexi]);
                 continue;
             }
 
             //set current node
-            if(current == null){
-                io::printfn("Node is Root");
-                current = doc.root;
-            }else{
-                io::printfn("Node is not Root");
-                current = new_node(current);
-            }
+            current = new_node(current);
 
             //start tag
             i++;
-            XMLAttribute* current_attribute = calloc(XMLAttribute.sizeof);
+            XMLAttribute* current_attribute;
             while(file[i] != '>'){
                 lex[lexi++] = file[i++];
                 
@@ -133,10 +127,21 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 }
                 //attribute key
                 else if(file[i] == '='){
+                    if(current_attribute == null){
+                        current_attribute = calloc(XMLAttribute.sizeof);
+                    }
+
                     lex[lexi] = '\0';
                     current_attribute.key = from_char_array(&lex, lexi);
                     lexi = 0;
                     continue;
+                }
+                //comments
+                else if (file[i-1] == '<' && file[i] == '!' && file[i+1] == '-' && file[i+2] == '-'){
+                    i += 3;
+                    while(!(file[i] == '-' && file[i+1] == '-' && file[i+2] == '>')){
+                        i++;
+                    }
                 }
                 //attribute value
                 else if(file[i] == '\"'){
@@ -175,7 +180,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
 }
 
 fn XMLNode* new_node(XMLNode* parent){
-    XMLNode* node = malloc(XMLNode.sizeof);
+    XMLNode* node = calloc(XMLNode.sizeof);
     node.parent = parent;
     node.tag = "";
     node.inner_text = "";
