@@ -42,17 +42,16 @@ fn void XMLDocument.free(&self){
     if(self.encoding != null) free(self.encoding);
     if(self.version != null) free(self.version);
     if(self.root != null) self.root.free();
-    free(self);
 }
 
 fn void XMLNode.free(&self){
-    if(self.parent != null) self.parent.free();
     self.attributes.free();
     self.children.free();
     if(self.tag != null) free(self.tag);
     if(self.inner_text != null) free(self.inner_text);
     free(self);
 }
+
 
 fn int XMLDocument.load(XMLDocument* doc, String path){
     if(!file::is_file(path)){
@@ -100,23 +99,69 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 }
                 current = current.parent;
                 i++;
+                // io::printfn("lex contents: %s", lex[0..lexi]);
                 continue;
             }
 
             //set current node
             if(current == null){
+                io::printfn("Node is Root");
                 current = doc.root;
             }else{
+                io::printfn("Node is not Root");
                 current = new_node(current);
             }
 
-            //get tag name
+            //start tag
             i++;
+            XMLAttribute* current_attribute = calloc(XMLAttribute.sizeof);
             while(file[i] != '>'){
                 lex[lexi++] = file[i++];
+                
+                //tag name
+                if(file[i] == ' ' && (current.tag.len() == 0)){
+                    lex[lexi] = '\0';
+                    current.tag = from_char_array(&lex, lexi);
+                    lexi = 0;
+                    i++;
+                    continue;
+                }
+                //ignore spaces (usually)
+                else if(lex[lexi-1] == ' '){
+                    lexi--;
+                    continue;
+                }
+                //attribute key
+                else if(file[i] == '='){
+                    lex[lexi] = '\0';
+                    current_attribute.key = from_char_array(&lex, lexi);
+                    lexi = 0;
+                    continue;
+                }
+                //attribute value
+                else if(file[i] == '\"'){
+                    if(current_attribute.key == null){
+                        io::printfn("[ERROR] Value has no key.");
+                        return 1;
+                    }
+                    lexi = 0;
+                    i++;
+                    while(file[i] != '\"'){
+                        lex[lexi++] = file[i++];
+                    }
+                    lex[lexi] = '\0';
+                    current_attribute.value = from_char_array(&lex, lexi);
+                    current.attributes.push(current_attribute);
+                    current_attribute = null;
+                    lexi = 0;
+                    i++;
+                    continue;
+                }
             }
             lex[lexi] = '\0';
-            current.tag = from_char_array(&lex, lexi);
+            if(current.tag.len() == 0 || current.tag == null){
+                current.tag = from_char_array(&lex, lexi);
+            }
             lexi = 0;
             i++;
             continue;
@@ -126,10 +171,6 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
             lex[lexi++] = file[i++];
         }
     }
-    io::printfn("root: %s", doc.root.inner_text);
-    io::printfn("root: %s", doc.root.tag);
-    io::printfn("child: %s", doc.root.children.get(0).inner_text);
-    io::printfn("child: %s", doc.root.children.get(0).tag);
     return 0;
 }
 
@@ -153,6 +194,8 @@ macro ZString from_char_array(char[] arr, int len) {
 }
 
 macro bool compare_tags(ZString tag, char[] buffer, int len){
+    // io::printfn("Buffer contents: %s", buffer[0..len]);
+    // io::printfn("Tag contents: %s", tag);
     if(tag.len() > len) return true;
     for(int i = 0; i < len; i++){
         if(tag[i] - buffer[i] != 0){
