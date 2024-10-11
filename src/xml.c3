@@ -53,6 +53,17 @@ fn void XMLNode.free(&self){
     // free(self);
 }
 
+fn XMLNode* new_node(XMLNode* parent){
+    XMLNode* node   = calloc(XMLNode.sizeof);
+    node.parent     = parent;
+    node.tag        = "";
+    node.inner_text = "";
+    node.attributes.new_init();
+    node.children.new_init();
+    if (parent != null) parent.children.push(node);
+    return node;
+}
+
 
 fn int XMLDocument.load(XMLDocument* doc, String path){
     if(!file::is_file(path)){
@@ -68,6 +79,8 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     int lexi = 0;
     int i = 0;
 
+    for(i; file[i] != '<'; ++i); //skip to first node
+    // if(i != 0) i = handle_comments(file, i+2);
     XMLNode* current = doc.root;
     while(i < file.len){
         if(file[i] == '<'){
@@ -100,6 +113,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 }
                 current = current.parent;
                 i++;
+                lexi = 0;
                 continue;
             }
 
@@ -111,9 +125,12 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
             XMLAttribute* current_attribute;
             while(file[i] != '>'){
                 lex[lexi++] = file[i++];
-                
+                //trying new comment handling
+                if(i != handle_comments(file, i)){
+                    break;
+                }
                 //tag name
-                if(file[i] == ' ' && (current.tag.len() == 0)){
+                else if(file[i] == ' ' && (current.tag.len() == 0)){
                     lex[lexi] = '\0';
                     current.tag = from_char_array(&lex, lexi);
                     lexi = 0;
@@ -136,13 +153,6 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                     lexi = 0;
                     continue;
                 }
-                //comments
-                else if (file[i-1] == '<' && file[i] == '!' && file[i+1] == '-' && file[i+2] == '-'){
-                    i += 3;
-                    while(!(file[i] == '-' && file[i+1] == '-' && file[i+2] == '>')){
-                        i++;
-                    }
-                }
                 //attribute value
                 else if(file[i] == '\"'){
                     if(current_attribute.key == null){
@@ -164,7 +174,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 }
             }
             lex[lexi] = '\0';
-            if(current.tag.len() == 0 || current.tag == null){
+            if( current.tag == null || current.tag.len() == 0){
                 current.tag = from_char_array(&lex, lexi);
             }
             lexi = 0;
@@ -179,21 +189,20 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     return 0;
 }
 
-fn XMLNode* new_node(XMLNode* parent){
-    XMLNode* node = calloc(XMLNode.sizeof);
-    node.parent = parent;
-    node.tag = "";
-    node.inner_text = "";
-    node.attributes.new_init();
-    node.children.new_init();
-    if (parent != null) parent.children.push_front(node);
-    return node;
+macro int handle_comments(char[] file, int i){
+    if(file[i-1] == '<' && file[i] == '!' && file[i+1] == '-' && file[i+2] == '-'){
+        i += 3;
+        while(!(file[i - 2] == '-' && file[i - 1] == '-' && file[i] == '>')){
+            i++;
+        }
+    }
+    return i;
 }
 
 macro ZString from_char_array(char[] arr, int len) {
     ZString zstr = (ZString) calloc(len*char.sizeof);
-    for(int c = 0; c < len; c++){
-        zstr[c] = arr[c];
+    for(int i = 0; (i) < len; i++){
+        zstr[i] = arr[ i];
     }
     return zstr;
 }
@@ -201,7 +210,7 @@ macro ZString from_char_array(char[] arr, int len) {
 macro bool compare_tags(ZString tag, char[] buffer, int len){
     // io::printfn("Buffer contents: %s", buffer[0..len]);
     // io::printfn("Tag contents: %s", tag);
-    if(tag.len() > len) return true;
+    if(tag.len() != len) return true;
     for(int i = 0; i < len; i++){
         if(tag[i] - buffer[i] != 0){
             return true;

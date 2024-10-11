@@ -1,8 +1,8 @@
-<!-- This is a comment! -->
+
 <root>
     <inner>
         <more>Hi this is s'more text!</more>
     </inner>
     <another key="value">This is another node!</another>
 </root>
-<!-- This is a comment! -->
+<!-- I bet you didn't expect a comment! -->
