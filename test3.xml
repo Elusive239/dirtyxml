@@ -1,8 +1,10 @@
-
+<!-- Lets start with a comment! -->
 <root>
     <inner>
+    <!-- Wowie, a comment! -->
         <more>Hi this is s'more text!</more>
     </inner>
+    <!-- Heres another one! -->
     <another key="value">This is another node!</another>
 </root>
 <!-- I bet you didn't expect a comment! -->

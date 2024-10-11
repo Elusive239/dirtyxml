@@ -60,10 +60,11 @@ fn void! test(){
 			dstring.append(".xml");
 			XMLDocument doc;
 			int test = doc.load(dstring.tcopy_str());
-			if(test != 0){
-				io::printfn("Test %d failed!", i);
-			}
 			dstring.clear();
+			if(test != 0){
+				io::printfn("[Failed Test %d]", i);
+				continue;
+			}
 			dstring.append_node(doc.root);
 			io::printf("%s", dstring);
 
