@@ -1,7 +1,7 @@
 import std::io;
 import xml;
 
-const int NUM_OF_TESTS = 3;
+const int NUM_OF_TESTS = 5;
 
 fn void DString.append_node(DString* dstr, XMLNode* node, usz tabs = 1){
 	if(node.tag.len() == 0 && node.children.len() > 0){
@@ -51,10 +51,10 @@ fn void DString.append_node(DString* dstr, XMLNode* node, usz tabs = 1){
 	dstr.append_char('\n');
 }
 
-fn void! test(){
+fn void! test(int i = 1){
 	@pool(){
 		DString dstring = dstring::temp_new();
-		for(int i = 1; i < NUM_OF_TESTS + 1; i++){
+		//for(i; i < NUM_OF_TESTS + 1; i++){
 			io::printfn("[Test %d]", i);
 			dstring.appendf("test%d", i);
 			dstring.append(".xml");
@@ -63,31 +63,21 @@ fn void! test(){
 			dstring.clear();
 			if(test != 0){
 				io::printfn("[Failed Test %d]", i);
-				continue;
+				return;
 			}
 			dstring.append_node(doc.root);
+			io::printfn("version=\"%s\" encoding=\"%s\"", doc.version , doc.encoding);
 			io::printf("%s", dstring);
 
-			/*
-				io::printfn("root: %s, %s", doc.root.tag, doc.root.inner_text);
-				for(int y = 0; y < doc.root.attributes.len(); y++) {
-					XMLAttribute attribute = *doc.root.attributes.get(y);
-					io::printfn("%s: %s", attribute.key, attribute.value);
-				}
-				for(int y = 0; y < doc.root.children.len(); y++) {
-					XMLNode child = *doc.root.children.get(y);
-					io::printfn("%s -> %s, %s", doc.root.tag, child.tag, child.inner_text);
-				}
-			*/
 			dstring.clear();
 			doc.free(); //still needs to be called, have not implemented allocators!
 			io::printfn("[End Test %d]", i);
-		}
+		//}
 	};
 }
 
 fn void! main(String[] args)
 {
-	test()!;
+	for(int i = 0; i < 4; i++) test(5)!;
 	// return 0;
 }
