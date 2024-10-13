@@ -48,10 +48,11 @@ fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
 fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
     for(int i = 0; i < self.attributes.len(); i++) allocator::free(allocator, self.attributes[i]);
     self.attributes.free();
-    for(int i = 0; i < self.children.len(); i++) allocator::free(allocator, self.children[i]);
+    for(int i = 0; i < self.children.len(); i++) self.children[i].free();
     self.children.free();
     if(self.tag.len > 0) allocator::free(allocator, self.tag);
     if(self.inner_text.len > 0) allocator::free(allocator, self.inner_text);
+    allocator::free(allocator, self);
 }
 
 /*OPENING/CREATING DOCUMENTS*/
@@ -296,9 +297,10 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
 
     DString dstr = dstring::new_with_capacity(100, allocator);
     if(doc.encoding.len > 0 || doc.version.len > 0) {
-        String encoding = doc.encoding.len > 0 ? doc.encoding : "UTF-8";
-        String version = doc.version.len > 0 ? doc.version : "1.0";
-        dstr.appendfn( "<?xml version=\"%s\" encoding=\"%s\"?>", encoding, version);
+        //doing copies because they may be freed later..
+        String encoding = (doc.encoding.len > 0 ? doc.encoding : "UTF-8").copy(allocator);
+        String version = (doc.version.len > 0 ? doc.version : "1.0").copy(allocator);
+        dstr.appendfn( "<?xml version=\"%s\" encoding=\"%s\"?>", version, encoding);
     }
     //if no tag & the root has children, then there are multiple root nodes 
     //so we just skip to those instead of printing the empty one.
@@ -325,7 +327,9 @@ fn void append_node(DString* dstr, XMLNode* node, int tabs = 1){
     String innerText = node.inner_text.trim(" \n\t\r\0");
     if(innerText.len > 0){
         for(int i =0; i < tabs; i++) dstr.append_char(TAB);
-        dstr.appendfn(">\n%s", innerText);
+        dstr.appendfn(">");
+        for(int i =0; i < tabs; i++) dstr.append_char(TAB);
+        dstr.appendf("%s\n", innerText);
     }else{
         dstr.appendfn(">");
     }

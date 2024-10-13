@@ -1,13 +1,21 @@
 import std::io;
 import xml;
 
+fn void test(int i){
+	XMLDocument doc;
+	defer doc.free();
+	DString dstr;
+	dstr.append("test");
+	dstr.appendf("%d.xml", i);
+	doc.load(dstr.str_view());
+	dstr.free();
+	io::printfn("[TEST %d]", i);
+	io::printf("%s", doc);
+	io::printfn("[COMPLETE %d]", i);
+}
 
 fn int main(String[] args)
 {
-	XMLDocument doc;
-	defer doc.free();
-	doc.load("test6.xml");
-	io::printf("%s", doc);
-	// doc.write("out_test6.xml");
+	for(int i = 1; i < 7; i++) test(i);
 	return 0;
 }
