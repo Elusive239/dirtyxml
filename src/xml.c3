@@ -71,6 +71,8 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
     return "";
 }
 
+/*OPENING DOCUMENTS*/
+
 fn int XMLDocument.load(XMLDocument* doc, String path){
     if(!file::is_file(path)){
         io::printfn("[INFO] File \"%s\" not found. Check your paths?", path);
@@ -88,7 +90,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     XMLNode* current = doc.root;
     while(i < file.len){
         if(file[i] == '<'){
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             //inner text
             if(lexi > 0){
                 if(current == null){
@@ -106,7 +108,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 while(file[i] != '>'){
                     lex[lexi++] = file[i++];
                 }
-                lex[lexi] = '\0';
+                lex[lexi] = 0;
                 if(current == null){
                     io::printfn("[ERROR] Already at the root!" );
                     return 1;
@@ -124,13 +126,13 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
             //special nodes
             if(file[i+1] == '!' && file[i+2] == '-' && file[i+3] == '-'){
                 while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
-                lex[lexi] = '\0';
+                lex[lexi] = 0;
 
                 if(!compare_char_arr("<!--", &lex, lexi)){
-                    lex[lexi] = '\0';
+                    lex[lexi] = 0;
                     while(!(file[i-2] == '-' && file[i-1] == '-' && file[i] == '>')){
                         lex[lexi++] = file[i++];
-                        lex[lexi] = '\0';
+                        lex[lexi] = 0;
                     }
                     continue;
                 }
@@ -138,7 +140,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
 
             if(file[i+1] == '?'){
                 while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
-                lex[lexi] = '\0';
+                lex[lexi] = 0;
                 if(!compare_char_arr("<?xml", &lex, lexi)){
                     lexi = 0;
                     XMLNode* desc = new_node(null);
@@ -168,7 +170,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 return 1;
             }
             
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             if( current.tag.len == 0){
                 current.tag = copy_zfa(&lex, lexi);
             }
@@ -191,7 +193,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         lex[lexi++] = file[i++];
         //tag name
         if(file[i] == ' ' && current.tag.len == 0){
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             current.tag = copy_zfa(lex, lexi);
             lexi = 0;
             i++;
@@ -205,7 +207,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         //attribute key
         if(file[i] == '='){
             current_attribute = calloc(XMLAttribute.sizeof);
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             current_attribute.key = copy_zfa(lex, lexi);
             lexi = 0;
             continue;
@@ -221,7 +223,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
             while(file[i] != '\"'){
                 lex[lexi++] = file[i++];
             }
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             current_attribute.value = copy_zfa(lex, lexi);
             current.attributes.push(current_attribute);
             current_attribute = null;
@@ -230,7 +232,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
             continue;
         }
         if (file[i-1] == '/' && file[i] == '>'){
-            lex[lexi] = '\0';
+            lex[lexi] = 0;
             if(current.tag.len == 0){
                 current.tag = copy_zfa(lex, lexi);
                 i++;
@@ -246,12 +248,13 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
     return TagType.TAG_START;
 }
 
-macro String copy_zfa(char[] arr, int len) {
-    String zstr = ((String)arr[0..len]).copy();
+macro String copy_zfa(char[] arr, int len)  @private{
+    String zstr = ((String)arr[0..len-1]).copy();
     return zstr;
 }
 
-macro bool compare_char_arr(String tag, char[] buffer, int len){
+macro bool compare_char_arr(String tag, char[] buffer, int len)  @private{
+    len = len;
     for(int i = 0; i < len; i++){
         if(tag[i] - buffer[i] != 0){
             return true;
@@ -260,11 +263,128 @@ macro bool compare_char_arr(String tag, char[] buffer, int len){
     return false;
 }
 
-macro bool str_equal(String a, String b){
-    // b = b[0..(b.len-2)];
-    if(a.len != b.len) return false;
-    for(int i = 0; i < a.len; i++){
+macro bool str_equal(String a, String b) @private{
+    // if(a.len != b.len) return false;
+    for(int i = 0; i < b.len; i++){
         if(a[i] != b[i]) return false;
     }
     return true;
 }
+
+/*SAVING DOCUMENTS*/
+
+fn int XMLDocument.write(XMLDocument* doc, String outpath){
+    File! file = file::open(outpath, "w");
+    defer file.close()!!;
+    if(catch file){
+        io::printfn("[ERROR] Couldn't create or open file %s!", outpath);
+        return 1;
+    }
+    usz! res = file.write(doc.to_string());
+    if(catch res){
+        io::printfn("[ERROR] Failed to write to opened file %s!", outpath);
+        return 1;
+    }
+    return 0;
+}
+
+fn String XMLDocument.to_string(XMLDocument* doc){
+    if(doc.root == null){
+        io::printfn("[ERROR] No document loaded!");
+        return "";
+    }
+
+    DString dstr;
+    if(doc.encoding.len > 0 || doc.version.len > 0) {
+        String encoding = doc.encoding.len > 0 ? doc.encoding : "UTF-8";
+        String version = doc.version.len > 0 ? doc.version : "1.0";
+        dstr.appendfn( "<?xml version=\"%s\" encoding=\"%s\"?>", encoding, version);
+    }
+    //if no tag & the root has children, then there are multiple root nodes 
+    //so we just skip to those instead of printing the empty one.
+    if(doc.root.tag.len == 0 && doc.root.children.len() > 0){
+		for(int i =0; i < doc.root.children.len(); i++){
+			XMLNode* cnode = doc.root.children[i];
+			append_node(&dstr, cnode);
+		}
+	}else {
+        append_node(&dstr, doc.root);
+    }
+    return dstr.copy_str();
+}
+
+fn void append_node(DString* dstr, XMLNode* node, int tabs = 1){
+    const char TAB = '\t';
+    for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
+    dstr.appendf("<%s", node.tag);
+    append_tags(dstr, node);
+    if(node.inner_text.len == 0 && node.children.len() == 0){ //inline nodes
+        dstr.appendfn("/>");
+        return;
+    }
+    String innerText = node.inner_text.trim(" \n\t\r\0");
+    if(innerText.len > 0){
+        for(int i =0; i < tabs; i++) dstr.append_char(TAB);
+        dstr.appendfn(">\n%s", innerText);
+    }else{
+        dstr.appendfn(">");
+    }
+    for(int i =0; i < node.children.len(); i++) append_node(dstr, node.children[i], tabs + 1);
+    for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
+	dstr.appendfn("</%s>", node.tag);
+}
+
+macro void append_tags(DString* dstr, XMLNode* node){
+    for(int i =0; i < node.attributes.len(); i++){
+		XMLAttribute* attribute = node.attributes.get(i);
+		dstr.appendf (" %s=\"%s\"", attribute.key, attribute.value);
+	}
+}
+
+// fn void DString.append_node(DString* dstr, XMLNode* node, usz tabs = 1){
+// 	if(node.tag.len == 0 && node.children.len() > 0){
+// 		for(int i =0; i < node.children.len(); i++){
+// 			XMLNode* cnode = node.children[i];
+// 			dstr.append_node(cnode, tabs);
+// 		}
+// 		return;
+// 	}else if(node.tag.len == 0){
+// 		dstr.append("[ERROR] Tag has no length & no children.");
+// 		return;
+// 	}
+
+
+// 	const char TAB = '\t';
+// 	dstr.append_repeat(TAB, tabs-1);
+// 	dstr.appendf("<%s", node.tag);
+// 	//append attributes
+// 	for(int i =0; i < node.attributes.len(); i++){
+// 		XMLAttribute* attribute = node.attributes.get(i);
+// 		dstr.appendf (" %s=\"%s\"", attribute.key, attribute.value);
+// 		// &dstr.append_node(node.attributes.get(i), tabs + 1);
+// 	}
+// 	dstr.append_char('>');
+// 	if(node.inner_text.len > 0){
+// 		int j;
+// 		for(j; j < node.inner_text.len; j++){
+// 			char c = node.inner_text[j];
+// 			if(c == ' ' || c == '\n' || c == '\t' || c == '\r'){
+// 				break;
+// 			}
+// 		}
+// 		if(j != node.inner_text.len){
+// 			dstr.append_char('\n');
+// 			dstr.append_repeat(TAB, tabs);
+// 			dstr.appendf("%s", node.inner_text);
+// 		}
+// 	}
+// 	//append children
+// 	for(int i =0; i < node.children.len(); i++){
+// 		XMLNode* cnode = node.children[i];
+// 		dstr.append_node(cnode, tabs + 1);
+// 	}
+// 	dstr.append_char('\n');
+// 	dstr.append_repeat(TAB, tabs-1);
+// 	dstr.appendf("</%s>", node.tag);
+// 	dstr.append_char('\n');
+// }
