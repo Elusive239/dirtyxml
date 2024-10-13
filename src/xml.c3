@@ -25,10 +25,11 @@ struct XMLNode
     XMLNodeList children;
 }
 
-enum TagType
+enum TagType : int (int value)
 {
-    TAG_START,
-    TAG_INLINE
+    TAG_START = 0,
+    TAG_INLINE = 1,
+    ERROR = 2,
 }
 
 //decided to use C3s built in lists!
@@ -65,7 +66,7 @@ fn XMLNode* new_node(XMLNode* parent){
 
 fn String XMLNode.find_attribute(XMLNode* node, String key){
     for(int i =0; i < node.attributes.len(); i++){
-        if(str_equal(key, node.attributes[i].key)) return node.attributes[i].value;
+        if(str_equal(key, node.attributes[i].key[0..(node.attributes[i].key.len-2)])) return node.attributes[i].value;
     }
     return "";
 }
@@ -141,9 +142,9 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 if(!compare_char_arr("<?xml", &lex, lexi)){
                     lexi = 0;
                     XMLNode* desc = new_node(null);
-                    int success = parse_attributes(&lex, &lexi, file, &i, desc);
-                    if(success != 0){
-                        return success;
+                    if(parse_attributes(&lex, &lexi, file, &i, desc) == TagType.ERROR){
+                        io::printfn("[ERROR] Failed to parse attributes.");
+                        return 1;
                     }
                     doc.version = desc.find_attribute("version");
                     doc.encoding = desc.find_attribute("encoding");
@@ -157,9 +158,14 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
 
             //start tag
             i++;
-            int success = parse_attributes(&lex, &lexi, file, &i, current);
-            if(success != 0){
-                return success;
+            TagType ret = parse_attributes(&lex, &lexi, file, &i, current);
+            if(ret == TagType.TAG_INLINE){
+                current = current.parent;
+                i++;
+                continue;
+            }else if(ret == TagType.ERROR){
+                io::printfn("[ERROR] Failed to parse attributes.");
+                return 1;
             }
             
             lex[lexi] = '\0';
@@ -177,7 +183,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     return 0;
 }
 
-fn int parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current){
+fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current){
     int i = *xi;
     int lexi = *xlexi;
     XMLAttribute* current_attribute;
@@ -192,12 +198,12 @@ fn int parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* c
             continue;
         }
         //ignore spaces (usually)
-        else if(lex[lexi-1] == ' '){
+        if(lex[lexi-1] == ' '){
             lexi--;
-            continue;
+            // continue;
         }
         //attribute key
-        else if(file[i] == '='){
+        if(file[i] == '='){
             current_attribute = calloc(XMLAttribute.sizeof);
             lex[lexi] = '\0';
             current_attribute.key = copy_zfa(lex, lexi);
@@ -205,10 +211,10 @@ fn int parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* c
             continue;
         }
         //attribute value
-        else if(file[i] == '\"'){
+        if(file[i] == '\"'){
             if(current_attribute.key.len == 0){
                 io::printfn("[ERROR] Value has no key.");
-                return 1;
+                return TagType.ERROR;
             }
             lexi = 0;
             i++;
@@ -223,10 +229,21 @@ fn int parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* c
             i++;
             continue;
         }
+        if (file[i-1] == '/' && file[i] == '>'){
+            lex[lexi] = '\0';
+            if(current.tag.len == 0){
+                current.tag = copy_zfa(lex, lexi);
+                i++;
+            }
+            lexi = 0;
+            *xi = i;
+            *xlexi = lexi;
+            return TagType.TAG_INLINE;
+        }
     }
     *xi = i;
     *xlexi = lexi;
-    return 0;
+    return TagType.TAG_START;
 }
 
 macro String copy_zfa(char[] arr, int len) {
@@ -244,7 +261,7 @@ macro bool compare_char_arr(String tag, char[] buffer, int len){
 }
 
 macro bool str_equal(String a, String b){
-    b = b[0..(b.len-2)];
+    // b = b[0..(b.len-2)];
     if(a.len != b.len) return false;
     for(int i = 0; i < a.len; i++){
         if(a[i] != b[i]) return false;
