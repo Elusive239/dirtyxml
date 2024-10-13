@@ -3,7 +3,7 @@ import std::io;
 import std::collections;
 import std::io::path;
 
-struct XMLDocument
+struct XMLDocument (Printable)
 {
     XMLNode* root;
     String version;
@@ -273,14 +273,14 @@ macro bool str_equal(String a, String b) @private{
 
 /*SAVING DOCUMENTS*/
 
-fn int XMLDocument.write(XMLDocument* doc, String outpath){
+fn int XMLDocument.write(XMLDocument* doc, String outpath, Allocator allocator = allocator::heap()){
     File! file = file::open(outpath, "w");
     defer file.close()!!;
     if(catch file){
         io::printfn("[ERROR] Couldn't create or open file %s!", outpath);
         return 1;
     }
-    usz! res = file.write(doc.to_string());
+    usz! res = file.write(doc.to_string(allocator));
     if(catch res){
         io::printfn("[ERROR] Failed to write to opened file %s!", outpath);
         return 1;
@@ -288,13 +288,13 @@ fn int XMLDocument.write(XMLDocument* doc, String outpath){
     return 0;
 }
 
-fn String XMLDocument.to_string(XMLDocument* doc){
+fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocator::heap()) @dynamic{
     if(doc.root == null){
         io::printfn("[ERROR] No document loaded!");
         return "";
     }
 
-    DString dstr;
+    DString dstr = dstring::new_with_capacity(100, allocator);
     if(doc.encoding.len > 0 || doc.version.len > 0) {
         String encoding = doc.encoding.len > 0 ? doc.encoding : "UTF-8";
         String version = doc.version.len > 0 ? doc.version : "1.0";
