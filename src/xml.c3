@@ -29,7 +29,7 @@ enum TagType : int (int value)
 {
     TAG_START = 0,
     TAG_INLINE = 1,
-    ERROR = 2,
+    TAG_ERROR = 2,
 }
 
 //decided to use C3s built in lists!
@@ -39,27 +39,30 @@ def XMLNodeList = List(<XMLNode*>);
 //Functions
 
 
-fn void XMLDocument.free(&self){
-    if(self.encoding.len > 0) free(self.encoding);
-    if(self.version.len > 0) free(self.version);
+fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
+    if(self.encoding.len > 0) allocator::free(allocator, self.encoding);
+    if(self.version.len > 0) allocator::free(allocator, self.version);
     if(self.root != null) self.root.free();
 }
 
-fn void XMLNode.free(&self){
-   
+fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
+    for(int i = 0; i < self.attributes.len(); i++) allocator::free(allocator, self.attributes[i]);
     self.attributes.free();
+    for(int i = 0; i < self.children.len(); i++) allocator::free(allocator, self.children[i]);
     self.children.free();
-    if(self.tag.len > 0) free(self.tag);
-    if(self.inner_text.len > 0) free(self.inner_text);
+    if(self.tag.len > 0) allocator::free(allocator, self.tag);
+    if(self.inner_text.len > 0) allocator::free(allocator, self.inner_text);
 }
 
-fn XMLNode* new_node(XMLNode* parent){
-    XMLNode* node   = calloc(XMLNode.sizeof);
+/*OPENING/CREATING DOCUMENTS*/
+
+fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
+    XMLNode* node   = (XMLNode*) allocator::calloc(allocator, XMLNode.sizeof);
     node.parent     = parent;
     node.tag        = "";
     node.inner_text = "";
-    node.attributes.new_init();
-    node.children.new_init();
+    node.attributes.new_init(allocator: allocator);
+    node.children.new_init(allocator: allocator);
     if (parent != null) parent.children.push(node);
     return node;
 }
@@ -71,16 +74,15 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
     return "";
 }
 
-/*OPENING DOCUMENTS*/
 
-fn int XMLDocument.load(XMLDocument* doc, String path){
+fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
     if(!file::is_file(path)){
         io::printfn("[INFO] File \"%s\" not found. Check your paths?", path);
         return 1;
     }
-    char[] file = file::load_new(path)!!;
+    char[] file = file::load_new(path, allocator)!!;
 
-    doc.root = new_node(null);
+    doc.root = new_node(null, allocator);
 
     char[256] lex;
     int lexi = 0;
@@ -98,7 +100,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                     return 1;
                 }
 
-                current.inner_text = copy_zfa(&lex, lexi);
+                current.inner_text = copy_zfa(&lex, lexi, allocator);
                 lexi = 0;
             }
             
@@ -143,8 +145,8 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
                 lex[lexi] = 0;
                 if(!compare_char_arr("<?xml", &lex, lexi)){
                     lexi = 0;
-                    XMLNode* desc = new_node(null);
-                    if(parse_attributes(&lex, &lexi, file, &i, desc) == TagType.ERROR){
+                    XMLNode* desc = new_node(null, allocator);
+                    if(parse_attributes(&lex, &lexi, file, &i, desc, allocator) == TagType.TAG_ERROR){
                         io::printfn("[ERROR] Failed to parse attributes.");
                         return 1;
                     }
@@ -156,23 +158,23 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
             }
 
             //set current node
-            current = new_node(current);
+            current = new_node(current, allocator);
 
             //start tag
             i++;
-            TagType ret = parse_attributes(&lex, &lexi, file, &i, current);
+            TagType ret = parse_attributes(&lex, &lexi, file, &i, current, allocator);
             if(ret == TagType.TAG_INLINE){
                 current = current.parent;
                 i++;
                 continue;
-            }else if(ret == TagType.ERROR){
+            }else if(ret == TagType.TAG_ERROR){
                 io::printfn("[ERROR] Failed to parse attributes.");
                 return 1;
             }
             
             lex[lexi] = 0;
             if( current.tag.len == 0){
-                current.tag = copy_zfa(&lex, lexi);
+                current.tag = copy_zfa(&lex, lexi, allocator);
             }
             lexi = 0;
             i++;
@@ -185,7 +187,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path){
     return 0;
 }
 
-fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current){
+fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current, Allocator allocator = allocator::heap()){
     int i = *xi;
     int lexi = *xlexi;
     XMLAttribute* current_attribute;
@@ -194,7 +196,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         //tag name
         if(file[i] == ' ' && current.tag.len == 0){
             lex[lexi] = 0;
-            current.tag = copy_zfa(lex, lexi);
+            current.tag = copy_zfa(lex, lexi, allocator);
             lexi = 0;
             i++;
             continue;
@@ -206,9 +208,9 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         }
         //attribute key
         if(file[i] == '='){
-            current_attribute = calloc(XMLAttribute.sizeof);
+            current_attribute = (XMLAttribute*) allocator::calloc(allocator, XMLAttribute.sizeof);
             lex[lexi] = 0;
-            current_attribute.key = copy_zfa(lex, lexi);
+            current_attribute.key = copy_zfa(lex, lexi, allocator);
             lexi = 0;
             continue;
         }
@@ -216,7 +218,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         if(file[i] == '\"'){
             if(current_attribute.key.len == 0){
                 io::printfn("[ERROR] Value has no key.");
-                return TagType.ERROR;
+                return TagType.TAG_ERROR;
             }
             lexi = 0;
             i++;
@@ -224,7 +226,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
                 lex[lexi++] = file[i++];
             }
             lex[lexi] = 0;
-            current_attribute.value = copy_zfa(lex, lexi);
+            current_attribute.value = copy_zfa(lex, lexi, allocator);
             current.attributes.push(current_attribute);
             current_attribute = null;
             lexi = 0;
@@ -234,7 +236,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         if (file[i-1] == '/' && file[i] == '>'){
             lex[lexi] = 0;
             if(current.tag.len == 0){
-                current.tag = copy_zfa(lex, lexi);
+                current.tag = copy_zfa(lex, lexi, allocator);
                 i++;
             }
             lexi = 0;
@@ -248,13 +250,12 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
     return TagType.TAG_START;
 }
 
-macro String copy_zfa(char[] arr, int len)  @private{
-    String zstr = ((String)arr[0..len-1]).copy();
+macro String copy_zfa(char[] arr, int len, Allocator allocator = allocator::heap())  @private{
+    String zstr = ((String)arr[0..len-1]).copy(allocator);
     return zstr;
 }
 
 macro bool compare_char_arr(String tag, char[] buffer, int len)  @private{
-    len = len;
     for(int i = 0; i < len; i++){
         if(tag[i] - buffer[i] != 0){
             return true;
@@ -264,7 +265,6 @@ macro bool compare_char_arr(String tag, char[] buffer, int len)  @private{
 }
 
 macro bool str_equal(String a, String b) @private{
-    // if(a.len != b.len) return false;
     for(int i = 0; i < b.len; i++){
         if(a[i] != b[i]) return false;
     }
@@ -273,16 +273,16 @@ macro bool str_equal(String a, String b) @private{
 
 /*SAVING DOCUMENTS*/
 
-fn int XMLDocument.write(XMLDocument* doc, String outpath, Allocator allocator = allocator::heap()){
-    File! file = file::open(outpath, "w");
+fn int XMLDocument.write(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
+    File! file = file::open(path, "w");
     defer file.close()!!;
     if(catch file){
-        io::printfn("[ERROR] Couldn't create or open file %s!", outpath);
+        io::printfn("[ERROR] Couldn't create or open file %s!", path);
         return 1;
     }
     usz! res = file.write(doc.to_string(allocator));
     if(catch res){
-        io::printfn("[ERROR] Failed to write to opened file %s!", outpath);
+        io::printfn("[ERROR] Failed to write to opened file %s!", path);
         return 1;
     }
     return 0;

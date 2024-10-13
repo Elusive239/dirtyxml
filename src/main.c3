@@ -75,14 +75,10 @@ fn void test(int i = 1){
 
 fn int main(String[] args)
 {
-	// test(1);
-	// test(2);
-	// test(3);
-	// test(4);
-	// test(5);
-	// test(6);
 	XMLDocument doc;
+	defer doc.free();
 	doc.load("test6.xml");
-	doc.write("out_test6.xml");
+	io::printf("%s", doc);
+	// doc.write("out_test6.xml");
 	return 0;
 }
