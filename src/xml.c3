@@ -330,14 +330,7 @@ fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
         dstr.appendfn("/>");
         return;
     }
-    String innerText = node.inner_text.trim(" \n\t\r\0");
-    if(innerText.len > 0){
-        dstr.appendfn(">");
-        for(int i =0; i < tabs; i++) dstr.append_char(TAB);
-        dstr.appendf("%s\n", innerText);
-    }else{
-        dstr.appendfn(">");
-    }
+    dstr.append_inner_text(node, tabs);
     for(int i =0; i < node.children.len(); i++) dstr.append_node(node.children[i], tabs + 1);
     for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
 	dstr.appendfn("</%s>", node.tag);
@@ -348,4 +341,16 @@ macro void DString.append_tags(DString* dstr, XMLNode* node){
 		XMLAttribute* attribute = node.attributes.get(i);
 		dstr.appendf (" %s=\"%s\"", attribute.key, attribute.value);
 	}
+}
+
+macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
+    const char TAB = '\t';
+    String innerText = node.inner_text.trim(" \n\t\r\0");
+    if(innerText.len > 0){
+        dstr.appendfn(">");
+        for(int i =0; i < tabs; i++) dstr.append_char(TAB);
+        dstr.appendf("%s\n", innerText);
+    }else{
+        dstr.appendfn(">");
+    }
 }
