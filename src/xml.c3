@@ -326,7 +326,6 @@ fn void append_node(DString* dstr, XMLNode* node, int tabs = 1){
     }
     String innerText = node.inner_text.trim(" \n\t\r\0");
     if(innerText.len > 0){
-        for(int i =0; i < tabs; i++) dstr.append_char(TAB);
         dstr.appendfn(">");
         for(int i =0; i < tabs; i++) dstr.append_char(TAB);
         dstr.appendf("%s\n", innerText);
