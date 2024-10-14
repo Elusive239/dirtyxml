@@ -78,7 +78,7 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
 
 fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
     if(!file::is_file(path)){
-        io::printfn("[INFO] File \"%s\" not found. Check your paths?", path);
+        io::eprintfn("[ERROR] File \"%s\" not found. Check your paths?", path);
         return 1;
     }
     char[] file = file::load_new(path, allocator)!!;
@@ -97,7 +97,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = all
             //inner text
             if(lexi > 0){
                 if(current == null){
-                    io::printfn("[ERROR] Text outside of document.");
+                    io::eprintfn("[ERROR] Text outside of document.");
                     return 1;
                 }
 
@@ -113,11 +113,11 @@ fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = all
                 }
                 lex[lexi] = 0;
                 if(current == null){
-                    io::printfn("[ERROR] Already at the root!" );
+                    io::eprintfn("[ERROR] Already at the root!" );
                     return 1;
                 }
                 if (compare_char_arr(current.tag, &lex, lexi)){
-                    io::printfn("[ERROR] Mismatched tags (%s != %s)", current.tag, lex[0..lexi]);
+                    io::eprintfn("[ERROR] Mismatched tags (%s != %s)", current.tag, lex[0..lexi]);
                     return 1;
                 }
                 current = current.parent;
@@ -148,7 +148,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = all
                     lexi = 0;
                     XMLNode* desc = new_node(null, allocator);
                     if(parse_attributes(&lex, &lexi, file, &i, desc, allocator) == TagType.TAG_ERROR){
-                        io::printfn("[ERROR] Failed to parse attributes.");
+                        io::eprintfn("[ERROR] Failed to parse attributes.");
                         return 1;
                     }
                     doc.version = desc.find_attribute("version");
@@ -169,7 +169,7 @@ fn int XMLDocument.load(XMLDocument* doc, String path, Allocator allocator = all
                 i++;
                 continue;
             }else if(ret == TagType.TAG_ERROR){
-                io::printfn("[ERROR] Failed to parse attributes.");
+                io::eprintfn("[ERROR] Failed to parse attributes.");
                 return 1;
             }
             
@@ -218,7 +218,7 @@ fn TagType parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNod
         //attribute value
         if(file[i] == '\"'){
             if(current_attribute.key.len == 0){
-                io::printfn("[ERROR] Value has no key.");
+                io::eprintfn("[ERROR] Value has no key.");
                 return TagType.TAG_ERROR;
             }
             lexi = 0;
@@ -278,12 +278,12 @@ fn int XMLDocument.write(XMLDocument* doc, String path, Allocator allocator = al
     File! file = file::open(path, "w");
     defer file.close()!!;
     if(catch file){
-        io::printfn("[ERROR] Couldn't create or open file %s!", path);
+        io::eprintfn("[ERROR] Couldn't create or open file %s!", path);
         return 1;
     }
     usz! res = file.write(doc.to_string(allocator));
     if(catch res){
-        io::printfn("[ERROR] Failed to write to opened file %s!", path);
+        io::eprintfn("[ERROR] Failed to write to opened file %s!", path);
         return 1;
     }
     return 0;
@@ -291,7 +291,7 @@ fn int XMLDocument.write(XMLDocument* doc, String path, Allocator allocator = al
 
 fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocator::heap()) @dynamic{
     if(doc.root == null){
-        io::printfn("[ERROR] No document loaded!");
+        io::eprintfn("[ERROR] No document loaded!");
         return "";
     }
 
@@ -307,19 +307,19 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
     if(doc.root.tag.len == 0 && doc.root.children.len() > 0){
 		for(int i =0; i < doc.root.children.len(); i++){
 			XMLNode* cnode = doc.root.children[i];
-			append_node(&dstr, cnode);
+			dstr.append_node(cnode);
 		}
 	}else {
-        append_node(&dstr, doc.root);
+        dstr.append_node(doc.root);
     }
     return dstr.copy_str();
 }
 
-fn void append_node(DString* dstr, XMLNode* node, int tabs = 1){
+fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
     const char TAB = '\t';
     for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
     dstr.appendf("<%s", node.tag);
-    append_tags(dstr, node);
+    dstr.append_tags(node);
     if(node.inner_text.len == 0 && node.children.len() == 0){ //inline nodes
         dstr.appendfn("/>");
         return;
@@ -332,12 +332,12 @@ fn void append_node(DString* dstr, XMLNode* node, int tabs = 1){
     }else{
         dstr.appendfn(">");
     }
-    for(int i =0; i < node.children.len(); i++) append_node(dstr, node.children[i], tabs + 1);
+    for(int i =0; i < node.children.len(); i++) dstr.append_node(node.children[i], tabs + 1);
     for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
 	dstr.appendfn("</%s>", node.tag);
 }
 
-macro void append_tags(DString* dstr, XMLNode* node){
+macro void DString.append_tags(DString* dstr, XMLNode* node){
     for(int i =0; i < node.attributes.len(); i++){
 		XMLAttribute* attribute = node.attributes.get(i);
 		dstr.appendf (" %s=\"%s\"", attribute.key, attribute.value);
