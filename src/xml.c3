@@ -16,7 +16,7 @@ struct XMLAttribute
     String value;
 }
 
-struct XMLNode
+struct XMLNode (Printable)
 {
     String tag;
     String inner_text;
@@ -312,7 +312,13 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
 	}else {
         dstr.append_node(doc.root);
     }
-    return dstr.copy_str();
+    return dstr.copy_str(allocator);
+}
+
+fn String XMLNode.to_string(XMLNode* node, Allocator allocator = allocator::heap()) @dynamic{
+    DString dstr = dstring::new_with_capacity(100, allocator);
+    dstr.append_node(node);
+    return dstr.copy_str(allocator);
 }
 
 fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
