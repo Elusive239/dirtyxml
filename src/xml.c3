@@ -11,7 +11,7 @@ struct XMLDocument (Printable)
     String encoding;
 }
 
-struct XMLAttribute
+struct XMLAttribute (Printable)
 {
     String key;
     String value;
@@ -52,12 +52,18 @@ fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
 }
 
 fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
-    for(int i = 0; i < self.attributes.len(); i++) allocator::free(allocator, self.attributes[i]);
+    for(int i = 0; i < self.attributes.len(); i++) self.attributes[i].free(allocator);
     self.attributes.free();
     for(int i = 0; i < self.children.len(); i++) self.children[i].free();
     self.children.free();
     if(self.tag.len > 0) allocator::free(allocator, self.tag);
     if(self.inner_text.len > 0) allocator::free(allocator, self.inner_text);
+    allocator::free(allocator, self);
+}
+
+fn void XMLAttribute.free(&self, Allocator allocator = allocator::heap()){
+    if(self.key.len   != 0) allocator::free(allocator, self.key);
+    if(self.value.len != 0) allocator::free(allocator, self.value);
     allocator::free(allocator, self);
 }
 
@@ -83,22 +89,21 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
 }
 
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
-    usz len = io::available(stream)!;
+    usz len = io::available(stream)! ;
     char* buffer = allocator::malloc(allocator, char.sizeof * len);
-    if (catch io::read_all(stream, buffer[:len])){
-    }
+    stream.read(buffer[:len])!;
     doc.load(buffer[:len])!;
     allocator::free(allocator, buffer);
 }
 
 fn void! XMLDocument.load_from_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){
-    char[] file = load_path_new(path, allocator)!;
-    doc.load(file)!;
+    doc.load_file(path.str_view(), allocator)!;
 }
 
 fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
     char[] file = file::load_new(path, allocator)!;
     doc.load(file)!;
+    allocator::free(allocator, file);
 }
 
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
@@ -169,8 +174,8 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     
 
                     parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
-                    doc.version = desc.find_attribute("version");
-                    doc.encoding = desc.find_attribute("encoding");
+                    doc.version = desc.find_attribute("version").copy(allocator);
+                    doc.encoding = desc.find_attribute("encoding").copy(allocator);
                     desc.free();
                     continue;
                 }
@@ -294,9 +299,7 @@ fn void! XMLDocument.write_to_file(XMLDocument* doc, String path, Allocator allo
 }
 
 fn void! XMLDocument.write_to_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){
-    File file = file::open_path(path, "w")!;
-    file.write(doc.to_string(allocator))!;
-    file.close()!;
+    doc.write_to_file(path.str_view(), allocator)!;
 }
 
 fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocator::heap()) @dynamic{
@@ -306,6 +309,7 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
     }
 
     DString dstr = dstring::new_with_capacity(100, allocator);
+    defer dstr.free();
     if(doc.encoding.len > 0 || doc.version.len > 0) {
         //doing copies because they may be freed later..
         String encoding = (doc.encoding.len > 0 ? doc.encoding : "UTF-8").copy(allocator);
@@ -327,8 +331,16 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
 
 fn String XMLNode.to_string(XMLNode* node, Allocator allocator = allocator::heap()) @dynamic{
     DString dstr = dstring::new_with_capacity(100, allocator);
+    defer dstr.free();
     dstr.append_node(node);
     return dstr.copy_str(allocator);
+}
+
+fn String XMLAttribute.to_string(XMLAttribute* attribute, Allocator allocator = allocator::heap()) @dynamic{
+    DString dstr = dstring::new_with_capacity(100, allocator);
+    defer dstr.free();
+    dstr.appendf("%s=\"%s\"", attribute.key, attribute.value);
+    return dstr.copy_str();
 }
 
 fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
@@ -349,7 +361,7 @@ fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
 macro void DString.append_tags(DString* dstr, XMLNode* node){
     for(int i =0; i < node.attributes.len(); i++){
 		XMLAttribute* attribute = node.attributes.get(i);
-		dstr.appendf (" %s=\"%s\"", attribute.key, attribute.value);
+		dstr.appendf (" %s", attribute);
 	}
 }
 
@@ -363,20 +375,4 @@ macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
     }else{
         dstr.appendfn(">");
     }
-}
-
-fn char[]! load_path_new(Path path, Allocator allocator = allocator::heap()) @private
-{
-	File file = file::open_path(path, "rb")!;
-	defer (void)file.close();
-	usz len = file.seek(0, END)!;
-	file.seek(0, SET)!;
-	char* data = allocator::malloc_try(allocator, len)!;
-	defer catch allocator::free(allocator, data);
-	usz read = 0;
-	while (read < len)
-	{
-		read += file.read(data[read:len - read])!;
-	}
-	return data[:len];
 }
