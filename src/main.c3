@@ -22,5 +22,6 @@ fn void! test(int i){
 fn void main(String[] args)
 {
 	for(int i = 1; i < 7; i++) test(i)!!;
+	// test(6)!!;
 	// return 0;
 }

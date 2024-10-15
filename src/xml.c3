@@ -76,16 +76,18 @@ fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
 
 fn String XMLNode.find_attribute(XMLNode* node, String key){
     for(int i =0; i < node.attributes.len(); i++){
-        if(str_equal(key, node.attributes[i].key[0..(node.attributes[i].key.len-2)])) return node.attributes[i].value;
+        String other = node.attributes[i].key[0..(node.attributes[i].key.len-2)];
+        if(str_equal(key, other)) return node.attributes[i].value;
     }
     return "";
 }
 
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
     usz len = io::available(stream)!;
-    char[] buffer = allocator::alloc_array(allocator, char, len);
-    io::read_all( stream, buffer)!;
-    doc.load(buffer)!;
+    char* buffer = allocator::malloc(allocator, char.sizeof * len);
+    if (catch io::read_all(stream, buffer[:len])){
+    }
+    doc.load(buffer[:len])!;
     allocator::free(allocator, buffer);
 }
 
@@ -106,7 +108,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
     int lexi = 0;
     int i = 0;
 
-    for(i; file[i] != '<'; ++i); //skip to first node
+    for(i; i < file.len && file[i] != '<'; ++i); //skip to first node
     XMLNode* current = doc.root;
     while(i < file.len){
         if(file[i] == '<'){
@@ -165,12 +167,8 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     lexi = 0;
                     XMLNode* desc = new_node(null, allocator);
                     
-                    if( parse_attributes(&lex, &lexi, file, &i, current, allocator)! == TagType.TAG_INLINE){
-                        current = current.parent;
-                        i++;
-                        continue;
-                    }
 
+                    parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
                     doc.version = desc.find_attribute("version");
                     doc.encoding = desc.find_attribute("encoding");
                     desc.free();
