@@ -82,14 +82,10 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
 }
 
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
-    // usz len = stream.len();
-    usz len = stream.seek(0, END)!;
-	stream.seek(0, SET)!;
-    //implement seeking to get length of buffer
-    char* buffer = allocator::calloc(allocator, char.sizeof * len);
-    io::read_all( stream, buffer[:len])!;
-    // io::printfn("Buffer: %s", buffer[0..len]);
-    doc.load(buffer[:len])!;
+    usz len = io::available(stream)!;
+    char[] buffer = allocator::alloc_array(allocator, char, len);
+    io::read_all( stream, buffer)!;
+    doc.load(buffer)!;
     allocator::free(allocator, buffer);
 }
 
