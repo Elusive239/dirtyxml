@@ -2,7 +2,8 @@ module xml;
 import std::io;
 import std::collections;
 import std::io::path;
-// import std::io::stream;
+
+// Types
 
 struct XMLDocument (Printable)
 {
@@ -39,11 +40,11 @@ fault XMLError{
     CLOSING_UNOPENED_NODE,
 }
 
-//decided to use C3s built in lists (for now!)
+// Decided to use C3s built in lists (for now!)
 def XMLAttributeList = List(<XMLAttribute*>);
 def XMLNodeList = List(<XMLNode*>);
 
-//Functions
+//Free Memory
 
 fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
     if(self.encoding.len > 0) allocator::free(allocator, self.encoding);
@@ -67,7 +68,7 @@ fn void XMLAttribute.free(&self, Allocator allocator = allocator::heap()){
     allocator::free(allocator, self);
 }
 
-/*OPENING/CREATING DOCUMENTS*/
+// Helper Methods
 
 fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
     XMLNode* node   = (XMLNode*) allocator::calloc(allocator, XMLNode.sizeof);
@@ -88,6 +89,8 @@ fn String XMLNode.find_attribute(XMLNode* node, String key){
     return "";
 }
 
+// Load from [SOURCE] Methods
+
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
     usz len = io::available(stream)! ;
     char* buffer = allocator::malloc(allocator, char.sizeof * len);
@@ -105,6 +108,8 @@ fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocato
     doc.load(file)!;
     allocator::free(allocator, file);
 }
+
+// Parse
 
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
     doc.root = new_node(null, allocator);
@@ -289,7 +294,7 @@ macro bool str_equal(String a, String b) @private{
     return true;
 }
 
-/*SAVING DOCUMENTS*/
+// Save to [SOURCE] Methods
 
 fn void! XMLDocument.write_to_stream(XMLDocument* doc, OutStream stream, Allocator allocator = allocator::heap()){
     String str = doc.to_string(allocator);
@@ -308,6 +313,8 @@ fn void! XMLDocument.write_to_file(XMLDocument* doc, String path, Allocator allo
 fn void! XMLDocument.write_to_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){
     doc.write_to_file(path.str_view(), allocator)!;
 }
+
+// Printable interface implementations
 
 fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocator::heap()) @dynamic{
     if(doc.root == null){
