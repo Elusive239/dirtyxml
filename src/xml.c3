@@ -1,4 +1,4 @@
-module xml;
+module dxml;
 import std::io;
 import std::collections;
 import std::io::path;
@@ -38,11 +38,13 @@ fault XMLError{
     TEXT_OUTSIDE_NODE,
     MISMATCHED_TAGS,
     CLOSING_UNOPENED_NODE,
+    ATTRIBUTE_DOES_NOT_EXIST,
+    CHILD_NODE_DOES_NOT_EXIST,
 }
 
 // Decided to use C3s built in lists (for now!)
-def XMLAttributeList = List(<XMLAttribute*>);
 def XMLNodeList = List(<XMLNode*>);
+def XMLAttributeList = List(<XMLAttribute*>);
 
 //Free Memory
 
@@ -81,21 +83,34 @@ fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
     return node;
 }
 
-fn String XMLNode.find_attribute(XMLNode* node, String key){
+fn String! XMLNode.get_attribute(XMLNode* node, String key){
     for(int i =0; i < node.attributes.len(); i++){
         String other = node.attributes[i].key[0..(node.attributes[i].key.len-2)];
-        if(str_equal(key, other)) return node.attributes[i].value;
+        if(!str_equal(key, other)) return node.attributes[i].value;
     }
-    return "";
+    return XMLError.ATTRIBUTE_DOES_NOT_EXIST?;
 }
 
-// Load from [SOURCE] Methods
+fn String XMLNode.try_get_attribute(XMLNode* node, String key){
+    String! str = node.get_attribute(key);
+    if(try str){
+        return "";
+    }
+    return str!!;
+}
+
+fn XMLNode*! get_child(XMLNode* node, int index){
+    if(index > node.children.len()) return XMLError.CHILD_NODE_DOES_NOT_EXIST?;
+    return node.children[index];
+}
+
+// Load data to parse from [SOURCE] Methods
 
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
     usz len = io::available(stream)! ;
-    char* buffer = allocator::malloc(allocator, char.sizeof * len);
-    stream.read(buffer[:len])!;
-    doc.load(buffer[:len])!;
+    char[] buffer = allocator::alloc_array(allocator, char, len);
+    io::read_all(stream, buffer)!;
+    doc.load(buffer)!;
     allocator::free(allocator, buffer);
 }
 
@@ -109,7 +124,7 @@ fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocato
     allocator::free(allocator, file);
 }
 
-// Parse
+// Parsing Functions
 
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
     doc.root = new_node(null, allocator);
@@ -130,7 +145,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     return XMLError.TEXT_OUTSIDE_NODE?;
                 }
 
-                current.inner_text = copy_zfa(&lex, lexi, allocator);
+                current.inner_text = copy_buffer(&lex, lexi, allocator);
                 lexi = 0;
             }
             
@@ -145,7 +160,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     io::eprintfn("[ERROR] Already at the root!" );
                     return XMLError.CLOSING_UNOPENED_NODE?;
                 }
-                if (compare_char_arr(current.tag, &lex, lexi)){
+                if (compare_buffer(current.tag, &lex, lexi)){
                     io::eprintfn("[ERROR] Mismatched tags (%s != %s)", current.tag, lex[0..lexi]);
                     return XMLError.MISMATCHED_TAGS?;
                 }
@@ -160,7 +175,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                 while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
                 lex[lexi] = 0;
 
-                if(!compare_char_arr("<!--", &lex, lexi)){
+                if(!compare_buffer("<!--", &lex, lexi)){
                     lex[lexi] = 0;
                     while(!(file[i-2] == '-' && file[i-1] == '-' && file[i] == '>')){
                         lex[lexi++] = file[i++];
@@ -173,14 +188,12 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
             if(file[i+1] == '?'){
                 while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
                 lex[lexi] = 0;
-                if(!compare_char_arr("<?xml", &lex, lexi)){
+                if(!compare_buffer("<?xml", &lex, lexi)){
                     lexi = 0;
                     XMLNode* desc = new_node(null, allocator);
-                    
-
                     parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
-                    doc.version = desc.find_attribute("version").copy(allocator);
-                    doc.encoding = desc.find_attribute("encoding").copy(allocator);
+                    doc.version = desc.try_get_attribute("version").copy(allocator);
+                    doc.encoding = desc.try_get_attribute("encoding").copy(allocator);
                     desc.free();
                     continue;
                 }
@@ -199,7 +212,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
             
             lex[lexi] = 0;
             if( current.tag.len == 0){
-                current.tag = copy_zfa(&lex, lexi, allocator);
+                current.tag = copy_buffer(&lex, lexi, allocator);
             }
             lexi = 0;
             i++;
@@ -220,7 +233,7 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
         //tag name
         if(file[i] == ' ' && current.tag.len == 0){
             lex[lexi] = 0;
-            current.tag = copy_zfa(lex, lexi, allocator);
+            current.tag = copy_buffer(lex, lexi, allocator);
             lexi = 0;
             i++;
             continue;
@@ -233,7 +246,7 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
         if(file[i] == '='){
             current_attribute = (XMLAttribute*) allocator::calloc(allocator, XMLAttribute.sizeof);
             lex[lexi] = 0;
-            current_attribute.key = copy_zfa(lex, lexi, allocator);
+            current_attribute.key = copy_buffer(lex, lexi, allocator);
             lexi = 0;
             continue;
         }
@@ -249,7 +262,7 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
                 lex[lexi++] = file[i++];
             }
             lex[lexi] = 0;
-            current_attribute.value = copy_zfa(lex, lexi, allocator);
+            current_attribute.value = copy_buffer(lex, lexi, allocator);
             current.attributes.push(current_attribute);
             current_attribute = null;
             lexi = 0;
@@ -259,7 +272,8 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
         if (file[i-1] == '/' && file[i] == '>'){
             lex[lexi] = 0;
             if(current.tag.len == 0){
-                current.tag = copy_zfa(lex, lexi, allocator);
+                //lexi -1 because '/'
+                current.tag = copy_buffer(lex, lexi-1, allocator);
                 i++;
             }
             lexi = 0;
@@ -273,28 +287,7 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
     return TagType.TAG_START;
 }
 
-macro String copy_zfa(char[] arr, int len, Allocator allocator = allocator::heap())  @private{
-    String zstr = ((String)arr[0..len-1]).copy(allocator);
-    return zstr;
-}
-
-macro bool compare_char_arr(String tag, char[] buffer, int len)  @private{
-    for(int i = 0; i < len; i++){
-        if(tag[i] - buffer[i] != 0){
-            return true;
-        }
-    }
-    return false;
-}
-
-macro bool str_equal(String a, String b) @private{
-    for(int i = 0; i < b.len; i++){
-        if(a[i] != b[i]) return false;
-    }
-    return true;
-}
-
-// Save to [SOURCE] Methods
+// Save parsed data to [SOURCE] Methods
 
 fn void! XMLDocument.write_to_stream(XMLDocument* doc, OutStream stream, Allocator allocator = allocator::heap()){
     String str = doc.to_string(allocator);
@@ -363,6 +356,7 @@ fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
     dstr.appendf("<%s", node.tag);
     dstr.append_tags(node);
     if(node.inner_text.len == 0 && node.children.len() == 0){ //inline nodes
+        // io::printfn("[INFO] %s, %s", node.tag, node.inner_text);
         dstr.appendfn("/>");
         return;
     }
@@ -389,4 +383,27 @@ macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
     }else{
         dstr.appendfn(">");
     }
+}
+
+// Helper Macros
+
+macro String copy_buffer(char[] buffer, int len, Allocator allocator = allocator::heap())  @private{
+    String zstr = ((String)buffer[0..len-1]).copy(allocator);
+    return zstr;
+}
+
+macro bool compare_buffer(String tag, char[] buffer, int len)  @private{
+    for(int i = 0; i < len; i++){
+        if(tag[i] - buffer[i] != 0){
+            return true;
+        }
+    }
+    return false;
+}
+
+macro bool str_equal(String a, String b) @private{
+    for(int i = 0; i < b.len; i++){
+        if(a[i] != b[i]) return true;
+    }
+    return false;
 }
