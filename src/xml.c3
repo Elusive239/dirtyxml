@@ -385,14 +385,16 @@ macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
     }
 }
 
+module dxml @private;
+
 // Helper Macros
 
-macro String copy_buffer(char[] buffer, int len, Allocator allocator = allocator::heap())  @private{
+macro String copy_buffer(char[] buffer, int len, Allocator allocator = allocator::heap()){
     String zstr = ((String)buffer[0..len-1]).copy(allocator);
     return zstr;
 }
 
-macro bool compare_buffer(String tag, char[] buffer, int len)  @private{
+macro bool compare_buffer(String tag, char[] buffer, int len){
     for(int i = 0; i < len; i++){
         if(tag[i] - buffer[i] != 0){
             return true;
@@ -401,7 +403,7 @@ macro bool compare_buffer(String tag, char[] buffer, int len)  @private{
     return false;
 }
 
-macro bool str_equal(String a, String b) @private{
+macro bool str_equal(String a, String b){
     for(int i = 0; i < b.len; i++){
         if(a[i] != b[i]) return true;
     }
