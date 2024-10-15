@@ -39,7 +39,7 @@ fault XMLError{
     CLOSING_UNOPENED_NODE,
 }
 
-//decided to use C3s built in lists!
+//decided to use C3s built in lists (for now!)
 def XMLAttributeList = List(<XMLAttribute*>);
 def XMLNodeList = List(<XMLNode*>);
 
@@ -291,11 +291,18 @@ macro bool str_equal(String a, String b) @private{
 
 /*SAVING DOCUMENTS*/
 
+fn void! XMLDocument.write_to_stream(XMLDocument* doc, OutStream stream, Allocator allocator = allocator::heap()){
+    String str = doc.to_string(allocator);
+    io::write_all(stream, str)!;
+    str.free();
+}
 
 fn void! XMLDocument.write_to_file(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
+    String str = doc.to_string(allocator);
     File file = file::open(path, "w")!;
-    file.write(doc.to_string(allocator))!;
+    file.write(str)!;
     file.close()!;
+    str.free();
 }
 
 fn void! XMLDocument.write_to_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){

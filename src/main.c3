@@ -12,7 +12,15 @@ fn void! test(int i){
 	File file = file::open(dstr.str_view(), "r")!;
 	doc.load_from_stream(&file)!;
 	file.close()!;
+	dstr.clear();
+	dstr.appendf("outtest%d.xml", i);
+
+	File file2 = file::open(dstr.str_view(), "w")!!;
+	doc.write_to_stream(&file2)!;
+	file2.close()!;
 	dstr.free();
+
+
 	io::printf("%s", doc);
 	io::printfn("[COMPLETE %d]", i);
 }
