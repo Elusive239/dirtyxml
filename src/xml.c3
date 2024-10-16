@@ -51,7 +51,7 @@ def XMLAttributeList = List(<XMLAttribute*>);
 fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
     if(self.encoding.len > 0) allocator::free(allocator, self.encoding);
     if(self.version.len > 0) allocator::free(allocator, self.version);
-    if(self.root != null) self.root.free();
+    if(self.root != null) self.root.free(allocator);
 }
 
 fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
@@ -221,6 +221,13 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
         else {
             lex[lexi++] = file[i++];
         }
+    }
+
+    if(doc.root.tag.len == 0 && doc.root.children.len() == 1 && doc.root.attributes.len() == 0){
+        current = doc.root;
+        doc.root = current.children[0];
+        current.children.pop()!!;
+        current.free(allocator);
     }
 }
 
