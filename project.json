@@ -26,10 +26,13 @@
   // Targets.
   "targets": {
     "xml_parser": {
-      // Executable or library.
+      "output": "build/testing",
       "type": "executable",
-      // Additional libraries, sources
-      // and overrides of global settings here.
+    },
+    "xml_parser_static": {
+      "output": "build/static",
+      "type": "static-lib",
+      
     },
   },
   // Global settings.
