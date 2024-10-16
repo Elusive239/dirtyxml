@@ -25,16 +25,12 @@
   // "target": "windows-x64",
   // Targets.
   "targets": {
-    "xml_parser": {
-      "output": "build/testing",
-      "type": "executable",
-    },
-    "xml_parser_static": {
-      "output": "build/static",
-      "type": "static-lib",
-      
-    },
+    "dxml": {
+			"type": "executable",
+			"sources": ["./test/*"]
+		}
   },
+  "safe": true,
   // Global settings.
   // CPU name, used for optimizations in the LLVM backend.
   "cpu": "generic",

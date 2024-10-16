@@ -3,5 +3,4 @@ docs
 resources
 lib
 scripts
-test
 outtest[0-9]*.xml
