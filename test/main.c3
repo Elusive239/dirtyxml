@@ -25,18 +25,22 @@ fn void! test(int i){
 	io::printfn("[COMPLETE %d]", i);
 }
 
-
-
 fn void main(String[] args)
 {
-	// for(int i = 1; i < 4; i++) test(i)!!;
-	unit_test_1();
-	unit_test_2();
-	unit_test_3();
-	unit_test_4();
+	if(args.len == 1){
+		io::printfn("[INFO] To use, pass in the name(s) of  XML File(s)!");
+		return;
+	}
+	@pool(){
+		foreach(filename : args[1..]){
+			XMLDocument* doc = mem::temp_new(XMLDocument);
+			doc.tload_file(filename)!!;
+			io::printfn("%s", doc);
+		}
+	};
 }
 
-fn void unit_test_1(){
+fn void unit_test_1() @test{
 	XMLDocument doc;
 	doc.load_file("test1.xml")!!;
 	assert(doc.root != null);
@@ -49,7 +53,7 @@ fn void unit_test_1(){
 	assert(doc.root == null);
 }
 
-fn void unit_test_2(){
+fn void unit_test_2() @test{
 	XMLDocument doc;
 	doc.load_file("test2.xml")!!;
 	assert(doc.root != null);
@@ -66,7 +70,7 @@ fn void unit_test_2(){
 	assert(doc.root == null);
 }
 
-fn void unit_test_3(){
+fn void unit_test_3() @test{
 	XMLDocument doc;
 	doc.load_file("test3.xml")!!;
 	assert(doc.root != null);
@@ -85,7 +89,7 @@ fn void unit_test_3(){
 	assert(doc.root == null);
 }
 
-fn void unit_test_4(){
+fn void unit_test_4() @test{
 	XMLDocument doc;
 	doc.load_file("test4.xml")!!;
 	assert(doc.root != null);

@@ -137,7 +137,6 @@ fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocato
     allocator::free(allocator, file);
 }
 
-// Parsing Functions
 
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
     doc.root = new_node(null, allocator);
@@ -235,6 +234,20 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
         current.children.pop()!!;
         current.free(allocator);
     }
+}
+
+//temporary allocator assumed
+
+fn void! XMLDocument.tload_from_path(XMLDocument* doc, Path path){
+    doc.load_from_path(path, allocator::temp())!;
+}
+
+fn void! XMLDocument.tload_file(XMLDocument* doc, String path){
+    doc.load_file(path, allocator::temp())!;
+}
+
+fn void! XMLDocument.tload(XMLDocument* doc, char[] file){
+    doc.load(file, allocator::temp())!;
 }
 
 fn bool! handle_comment(char[] lex, int* xlexi, char[] file, int* xi){
@@ -368,7 +381,7 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
     }
     //if no tag & the root has children, then there are multiple root nodes 
     //so we just skip to those instead of printing the empty one.
-    io::printfn("[%s]", doc.root.inner_text);
+    // io::printfn("[%s]", doc.root.inner_text);
     if(doc.root.tag.len == 0 && doc.root.children.len() > 0){
 		for(int i =0; i < doc.root.children.len(); i++){
 			XMLNode* cnode = doc.root.children[i];
