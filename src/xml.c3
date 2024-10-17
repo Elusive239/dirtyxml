@@ -170,8 +170,12 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     io::eprintfn("[ERROR] Text outside of document.");
                     return XMLError.TEXT_OUTSIDE_NODE?;
                 }
+                if(current.inner_text.len == 0){
+                    current.inner_text = copy_buffer(&lex, lexi, allocator);
+                }
 
-                current.inner_text = copy_buffer(&lex, lexi, allocator);
+                // current.inner_text = copy_buffer(&lex, lexi, allocator);
+                // io::printfn("WE GOT SOME TEXT: %s", current.inner_text);
                 lexi = 0;
             }
             
@@ -364,6 +368,7 @@ fn String XMLDocument.to_string(XMLDocument* doc, Allocator allocator = allocato
     }
     //if no tag & the root has children, then there are multiple root nodes 
     //so we just skip to those instead of printing the empty one.
+    io::printfn("[%s]", doc.root.inner_text);
     if(doc.root.tag.len == 0 && doc.root.children.len() > 0){
 		for(int i =0; i < doc.root.children.len(); i++){
 			XMLNode* cnode = doc.root.children[i];
@@ -413,7 +418,7 @@ macro void DString.append_tags(DString* dstr, XMLNode* node){
 
 macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
     const char TAB = '\t';
-    String innerText = node.inner_text.trim(" \n\t\r\0");
+    String innerText = node.inner_text;//.trim(" \n\t\r\0");
     if(innerText.len > 0){
         dstr.appendfn(">");
         for(int i =0; i < tabs; i++) dstr.append_char(TAB);

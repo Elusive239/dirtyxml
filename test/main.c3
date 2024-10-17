@@ -30,11 +30,62 @@ fn void! test(int i){
 fn void main(String[] args)
 {
 	// for(int i = 1; i < 4; i++) test(i)!!;
-	unit_test();
+	unit_test_1();
+	unit_test_2();
+	unit_test_3();
+	unit_test_4();
 }
 
+fn void unit_test_1(){
+	XMLDocument doc;
+	doc.load_file("test1.xml")!!;
+	assert(doc.root != null);
+	assert(doc.root.children.len() == 2);
+	assert_tag(doc.root.get_child(0), "root");
+	assert_str_equal(doc.root.get_child(0).inner_text, "I am root");
+	assert_tag(doc.root.get_child(1), "other");
+	assert_str_equal(doc.root.get_child(1).inner_text, "I am not root");
+	doc.free();
+	assert(doc.root == null);
+}
 
-fn void unit_test(){
+fn void unit_test_2(){
+	XMLDocument doc;
+	doc.load_file("test2.xml")!!;
+	assert(doc.root != null);
+	assert(doc.encoding.len == 0);
+	assert(doc.version.len == 0);
+	assert_tag(doc.root, "root");
+	assert_str_equal(doc.root.inner_text.trim(), "I am root"); //trim it because we can't have multiline strings
+	assert(doc.root.children.len() == 2);
+	assert(doc.root.attributes.len() == 0);
+	assert_tag(doc.root.get_child(0), "inline");
+	assert_tag(doc.root.get_child(1), "other");
+	assert_has_attribute(doc.root.get_child(1), "key", "value");
+	doc.free();
+	assert(doc.root == null);
+}
+
+fn void unit_test_3(){
+	XMLDocument doc;
+	doc.load_file("test3.xml")!!;
+	assert(doc.root != null);
+	assert(doc.encoding.len == 0);
+	assert(doc.version.len == 0);
+	assert_tag(doc.root, "root");
+	assert(doc.root.children.len() == 2);
+	assert_tag(doc.root.get_child(0), "inner");
+	assert(doc.root.get_child(0).children.len() == 1);
+	assert_tag(doc.root.get_child(0).get_child(0), "more");
+	assert_str_equal(doc.root.get_child(0).get_child(0).inner_text, "Hi this is s'more text!");
+	assert_tag(doc.root.get_child(1), "another");
+	assert_has_attribute(doc.root.get_child(1), "key", "value");
+	assert_str_equal(doc.root.get_child(1).inner_text, "This is another node!");
+	doc.free();
+	assert(doc.root == null);
+}
+
+fn void unit_test_4(){
 	XMLDocument doc;
 	doc.load_file("test4.xml")!!;
 	assert(doc.root != null);
