@@ -11,7 +11,8 @@
     </inventory>
 </character>
 <character name = "suzie" cash = "10">
-    <attacks>
+    <attacks  >
+    <!-- This is our characters attacks! --> 
         <swing desc="swing an equipped melee weapon at an opponent!" damage = "300" />
     </attacks>
     <inventory capacity ="200">

@@ -40,6 +40,7 @@ fault XMLError{
     CLOSING_UNOPENED_NODE,
     ATTRIBUTE_DOES_NOT_EXIST,
     CHILD_NODE_DOES_NOT_EXIST,
+    COMMENT_NEVER_CLOSED,
 }
 
 // Decided to use C3s built in lists (for now!)
@@ -100,6 +101,17 @@ fn String XMLNode.try_get_attribute(XMLNode* node, String key){
     return "";
 }
 
+fn XMLNode*[] XMLNode.get_by_tag(XMLNode* node, String tag, Allocator allocator = allocator::heap()){
+    XMLNodeList list;
+    list.new_init(allocator: allocator);
+    defer list.free();
+    for(int i =0; i < node.children.len(); i++){
+        String other = node.get_child(i).tag[0..(node.get_child(i).tag.len-1)];
+        if(!str_equal(other, tag)) list.push(node.get_child(i));
+    }
+    return list.to_new_array(allocator: allocator);
+}
+
 fn XMLNode* XMLNode.get_child(XMLNode* node, int index){
     // if(index > node.children.len()) return XMLError.CHILD_NODE_DOES_NOT_EXIST?;
     return node.children[index];
@@ -135,6 +147,19 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
     int i = 0;
 
     for(i; i < file.len && file[i] != '<'; ++i); //skip to first node
+    if(file[i+1] == '?'){                        //handle ?xml special node (the prolog)
+        while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
+        lex[lexi] = 0;
+        if(!compare_buffer("<?xml", &lex, lexi)){
+            lexi = 0;
+            XMLNode* desc = new_node(null, allocator);
+            desc.tag = ("?xml").copy(allocator);
+            parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
+            doc.version = desc.try_get_attribute("version").copy(allocator);
+            doc.encoding = desc.try_get_attribute("encoding").copy(allocator);
+            desc.free();
+        }
+    }
     XMLNode* current = doc.root;
     while(i < file.len){
         if(file[i] == '<'){
@@ -171,34 +196,9 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                 continue;
             }
 
-            //special nodes
-            if(file[i+1] == '!' && file[i+2] == '-' && file[i+3] == '-'){
-                while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
-                lex[lexi] = 0;
-
-                if(!compare_buffer("<!--", &lex, lexi)){
-                    lex[lexi] = 0;
-                    while(!(file[i-2] == '-' && file[i-1] == '-' && file[i] == '>')){
-                        lex[lexi++] = file[i++];
-                        lex[lexi] = 0;
-                    }
-                    continue;
-                }
-            }
-
-            if(file[i+1] == '?'){
-                while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
-                lex[lexi] = 0;
-                if(!compare_buffer("<?xml", &lex, lexi)){
-                    lexi = 0;
-                    XMLNode* desc = new_node(null, allocator);
-                    desc.tag = ("?xml").copy(allocator);
-                    parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
-                    doc.version = desc.try_get_attribute("version").copy(allocator);
-                    doc.encoding = desc.try_get_attribute("encoding").copy(allocator);
-                    desc.free();
-                    continue;
-                }
+            //comments
+            if(handle_comment(&lex, &lexi, file, &i)!){
+                continue;
             }
 
             //set current node
@@ -231,6 +231,28 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
         current.children.pop()!!;
         current.free(allocator);
     }
+}
+
+fn bool! handle_comment(char[] lex, int* xlexi, char[] file, int* xi){
+    //comments
+    int i = *xi;
+    int lexi = *xlexi;
+    if(!(file[i+1] == '!' && file[i+2] == '-' && file[i+3] == '-')) return false;
+    while(file[i] != ' ' && file[i] != '>') lex[lexi++] = file[i++];
+    lex[lexi] = 0;
+    if(!compare_buffer("<!--", lex, lexi)){
+        lex[lexi] = 0;
+        while(i < file.len && !(file[i-2] == '-' && file[i-1] == '-' && file[i] == '>')){
+            lex[lexi++] = file[i++];
+            lex[lexi] = 0;
+        }
+        *xi = i;
+        *xlexi = lexi;
+        return true;
+    }
+    *xi = i;
+    *xlexi = lexi;
+    return XMLError.COMMENT_NEVER_CLOSED?; //probably shouldn'y get here...
 }
 
 fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current, Allocator allocator = allocator::heap()){
