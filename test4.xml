@@ -1,0 +1,22 @@
+<?xml  encoding = "UTF-8" version="2.34" ?>
+<character name = "kris" cash = "600">
+    <attacks>
+        <swing desc="swing an equipped melee weapon at an opponent!" damage = "50" />
+    </attacks>
+    <inventory capacity ="200">
+        <item name="rope" value="30" weight ="16"/>
+        <item name="candle" value="10" weight ="1"/>
+        <item name="lighter" value="5" weight ="0.5"/>
+        <item name="sword" value="200" weight ="36"/>
+    </inventory>
+</character>
+<character name = "suzie" cash = "10">
+    <attacks>
+        <swing desc="swing an equipped melee weapon at an opponent!" damage = "300" />
+    </attacks>
+    <inventory capacity ="200">
+        <item name="cigars" value="500" weight ="0.5"/>
+        <item name="lighter" value="5" weight ="0.5"/>
+        <item name="big hammer" value="200" weight ="36"/>
+    </inventory>
+</character>

@@ -52,6 +52,7 @@ fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
     if(self.encoding.len > 0) allocator::free(allocator, self.encoding);
     if(self.version.len > 0) allocator::free(allocator, self.version);
     if(self.root != null) self.root.free(allocator);
+    self.root = null;
 }
 
 fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
@@ -85,8 +86,8 @@ fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
 
 fn String! XMLNode.get_attribute(XMLNode* node, String key){
     for(int i =0; i < node.attributes.len(); i++){
-        String other = node.attributes[i].key[0..(node.attributes[i].key.len-2)];
-        if(!str_equal(key, other)) return node.attributes[i].value;
+        String other = node.attributes[i].key[0..(node.attributes[i].key.len-1)];
+        if(!str_equal(other, key)) return node.attributes[i].value;
     }
     return XMLError.ATTRIBUTE_DOES_NOT_EXIST?;
 }
@@ -94,13 +95,13 @@ fn String! XMLNode.get_attribute(XMLNode* node, String key){
 fn String XMLNode.try_get_attribute(XMLNode* node, String key){
     String! str = node.get_attribute(key);
     if(try str){
-        return "";
+        return str;
     }
-    return str!!;
+    return "";
 }
 
-fn XMLNode*! get_child(XMLNode* node, int index){
-    if(index > node.children.len()) return XMLError.CHILD_NODE_DOES_NOT_EXIST?;
+fn XMLNode* XMLNode.get_child(XMLNode* node, int index){
+    // if(index > node.children.len()) return XMLError.CHILD_NODE_DOES_NOT_EXIST?;
     return node.children[index];
 }
 
@@ -191,6 +192,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                 if(!compare_buffer("<?xml", &lex, lexi)){
                     lexi = 0;
                     XMLNode* desc = new_node(null, allocator);
+                    desc.tag = ("?xml").copy(allocator);
                     parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
                     doc.version = desc.try_get_attribute("version").copy(allocator);
                     doc.encoding = desc.try_get_attribute("encoding").copy(allocator);
@@ -234,7 +236,9 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
 fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNode* current, Allocator allocator = allocator::heap()){
     int i = *xi;
     int lexi = *xlexi;
-    XMLAttribute* current_attribute;
+    XMLAttribute* current_attribute = null;
+    while(file[i] == ' ') i++; //skip any leading spaces
+
     while(file[i] != '>'){
         lex[lexi++] = file[i++];
         //tag name
@@ -251,7 +255,9 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
         }
         //attribute key
         if(file[i] == '='){
-            current_attribute = (XMLAttribute*) allocator::calloc(allocator, XMLAttribute.sizeof);
+            if(current_attribute == null){
+                current_attribute = (XMLAttribute*) allocator::calloc(allocator, XMLAttribute.sizeof);
+            }
             lex[lexi] = 0;
             current_attribute.key = copy_buffer(lex, lexi, allocator);
             lexi = 0;
@@ -259,8 +265,12 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
         }
         //attribute value
         if(file[i] == '\"'){
-            if(current_attribute.key.len == 0){
-                io::eprintfn("[ERROR] Value has no key.");
+            if(current_attribute == null){
+                io::eprintfn("[ERROR] current_attribute is null in attribute parsing.");
+                return XMLError.TAG_PARSING?;
+            }
+            else if(current_attribute.key.len == 0){
+                io::eprintfn("[ERROR] Attribute value has no key.");
                 return XMLError.TAG_PARSING?;
             }
             lexi = 0;
@@ -363,7 +373,6 @@ fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
     dstr.appendf("<%s", node.tag);
     dstr.append_tags(node);
     if(node.inner_text.len == 0 && node.children.len() == 0){ //inline nodes
-        // io::printfn("[INFO] %s, %s", node.tag, node.inner_text);
         dstr.appendfn("/>");
         return;
     }
