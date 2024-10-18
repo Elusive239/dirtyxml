@@ -1,7 +1,7 @@
 import std::io;
 import dxml;
 
-fn void! test(int i){
+fn void! test_stream(int i){
 	io::printfn("[TEST %d]", i);
 	XMLDocument doc;
 	defer doc.free();
@@ -28,7 +28,7 @@ fn void! test(int i){
 fn void main(String[] args)
 {
 	if(args.len == 1){
-		io::printfn("[INFO] To use, pass in the name(s) of  XML File(s)!");
+		io::printfn("[INFO] To use, pass in the name(s) of XML File(s)!");
 		return;
 	}
 	@pool(){
@@ -46,9 +46,9 @@ fn void unit_test_1() @test{
 	assert(doc.root != null);
 	assert(doc.root.children.len() == 2);
 	assert_tag(doc.root.get_child(0), "root");
-	assert_str_equal(doc.root.get_child(0).inner_text, "I am root");
+	@assert_str_equal(doc.root.get_child(0).inner_text, "I am root");
 	assert_tag(doc.root.get_child(1), "other");
-	assert_str_equal(doc.root.get_child(1).inner_text, "I am not root");
+	@assert_str_equal(doc.root.get_child(1).inner_text, "I am not root");
 	doc.free();
 	assert(doc.root == null);
 }
@@ -60,7 +60,7 @@ fn void unit_test_2() @test{
 	assert(doc.encoding.len == 0);
 	assert(doc.version.len == 0);
 	assert_tag(doc.root, "root");
-	assert_str_equal(doc.root.inner_text.trim(), "I am root"); //trim it because we can't have multiline strings
+	@assert_str_equal(doc.root.inner_text.trim(), "I am root"); //trim it because we can't have multiline strings
 	assert(doc.root.children.len() == 2);
 	assert(doc.root.attributes.len() == 0);
 	assert_tag(doc.root.get_child(0), "inline");
@@ -81,10 +81,10 @@ fn void unit_test_3() @test{
 	assert_tag(doc.root.get_child(0), "inner");
 	assert(doc.root.get_child(0).children.len() == 1);
 	assert_tag(doc.root.get_child(0).get_child(0), "more");
-	assert_str_equal(doc.root.get_child(0).get_child(0).inner_text, "Hi this is s'more text!");
+	@assert_str_equal(doc.root.get_child(0).get_child(0).inner_text, "Hi this is s'more text!");
 	assert_tag(doc.root.get_child(1), "another");
 	assert_has_attribute(doc.root.get_child(1), "key", "value");
-	assert_str_equal(doc.root.get_child(1).inner_text, "This is another node!");
+	@assert_str_equal(doc.root.get_child(1).inner_text, "This is another node!");
 	doc.free();
 	assert(doc.root == null);
 }
@@ -93,14 +93,14 @@ fn void unit_test_4() @test{
 	XMLDocument doc;
 	doc.load_file("test4.xml")!!;
 	assert(doc.root != null);
-	assert_str_equal(doc.encoding, "UTF-8");
-	assert_str_equal(doc.version, "2.34");
+	@assert_str_equal(doc.encoding, "UTF-8");
+	@assert_str_equal(doc.version, "2.34");
 	assert(doc.root.tag.len == 0);
 	assert(doc.root.children.len() == 2);
 	assert(doc.root.children[0].tag.len != 0);
 	assert(doc.root.children[1].tag.len != 0);
 	foreach(child : doc.root.children) {
-		assert_str_equal(child.tag, "character");
+		assert_tag(child, "character");
 	}
 	XMLNode* current = doc.root.get_child(0);
 	assert(current.children.len() == 2);
@@ -160,16 +160,16 @@ fn void unit_test_4() @test{
 }
 
 macro assert_tag(XMLNode* node, String a){
-	assert_str_equal(node.tag, a);
+	@assert_str_equal(node.tag, a, "\"%s\" != tag \"%s\" in this node.");
 }
 
 macro assert_has_attribute(XMLNode* node, String a, String b){
-	assert_str_equal(node.try_get_attribute(a), b);
+	@assert_str_equal(node.try_get_attribute(a), b, "\"%s\" has no value \"%s\" in this node.");
 }
 
-macro assert_str_equal(String a, String b){
-	assert(a.len == b.len);
+macro @assert_str_equal(String a, String b, $msg = "String \"%s\" != \"%s\""){
+	assert(a.len == b.len, "\"%s\" and \"%s\" are different sizes, therefore not equal.", a, b);
 	for(int i = 0; i < a.len ; i++){
-		assert(a[i] == b[i], "String \"%s\" != \"%s\"", a, b);
+		assert(a[i] == b[i],$msg, a, b);
 	}
 }
