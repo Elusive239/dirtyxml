@@ -167,7 +167,7 @@ macro assert_has_attribute(XMLNode* node, String a, String b){
 	@assert_str_equal(node.try_get_attribute(a), b, "\"%s\" has no value \"%s\" in this node.");
 }
 
-macro @assert_str_equal(String a, String b, $msg = "String \"%s\" != \"%s\""){
+macro @assert_str_equal(String a, String b, String $msg = "String \"%s\" != \"%s\""){
 	assert(a.len == b.len, "\"%s\" and \"%s\" are different sizes, therefore not equal.", a, b);
 	for(int i = 0; i < a.len ; i++){
 		assert(a[i] == b[i],$msg, a, b);

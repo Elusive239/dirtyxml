@@ -236,7 +236,11 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
     }
 }
 
-//temporary allocator assumed
+//temporary allocator versions
+
+fn void! XMLDocument.tload_from_stream(XMLDocument* doc, InStream stream){
+    doc.load_from_stream(stream, allocator::temp())!;
+}
 
 fn void! XMLDocument.tload_from_path(XMLDocument* doc, Path path){
     doc.load_from_path(path, allocator::temp())!;
