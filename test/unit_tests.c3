@@ -1,48 +1,8 @@
-import std::io;
 import dxml;
 
-fn void! test_stream(int i){
-	io::printfn("[TEST %d]", i);
+fn void test_1() @test{
 	XMLDocument doc;
-	defer doc.free();
-	DString dstr;
-	dstr.append("test");
-	dstr.appendf("%d.xml", i);
-	// doc.load_file(dstr.str_view())!!;
-	File file = file::open(dstr.str_view(), "rb")!;
-	doc.load_from_stream(&file)!;
-	file.close()!;
-	dstr.clear();
-	dstr.appendf("outtest%d.xml", i);
-
-	File file2 = file::open(dstr.str_view(), "wb")!!;
-	doc.write_to_stream(&file2)!;
-	file2.close()!;
-
-	dstr.free();
-
-	io::printf("%s", doc);
-	io::printfn("[COMPLETE %d]", i);
-}
-
-fn void main(String[] args)
-{
-	if(args.len == 1){
-		io::printfn("[INFO] To use, pass in the name(s) of XML File(s)!");
-		return;
-	}
-	@pool(){
-		foreach(filename : args[1..]){
-			XMLDocument* doc = mem::temp_new(XMLDocument);
-			doc.tload_file(filename)!!;
-			io::printfn("%s", doc);
-		}
-	};
-}
-
-fn void unit_test_1() @test{
-	XMLDocument doc;
-	doc.load_file("test1.xml")!!;
+	doc.load_file("resources/test1.xml")!!;
 	assert(doc.root != null);
 	assert(doc.root.children.len() == 2);
 	assert_tag(doc.root.get_child(0), "root");
@@ -53,9 +13,9 @@ fn void unit_test_1() @test{
 	assert(doc.root == null);
 }
 
-fn void unit_test_2() @test{
+fn void test_2() @test{
 	XMLDocument doc;
-	doc.load_file("test2.xml")!!;
+	doc.load_file("resources/test2.xml")!!;
 	assert(doc.root != null);
 	assert(doc.encoding.len == 0);
 	assert(doc.version.len == 0);
@@ -70,9 +30,9 @@ fn void unit_test_2() @test{
 	assert(doc.root == null);
 }
 
-fn void unit_test_3() @test{
+fn void test_3() @test{
 	XMLDocument doc;
-	doc.load_file("test3.xml")!!;
+	doc.load_file("resources/test3.xml")!!;
 	assert(doc.root != null);
 	assert(doc.encoding.len == 0);
 	assert(doc.version.len == 0);
@@ -89,9 +49,9 @@ fn void unit_test_3() @test{
 	assert(doc.root == null);
 }
 
-fn void unit_test_4() @test{
+fn void test_4() @test{
 	XMLDocument doc;
-	doc.load_file("test4.xml")!!;
+	doc.load_file("resources/test4.xml")!!;
 	assert(doc.root != null);
 	@assert_str_equal(doc.encoding, "UTF-8");
 	@assert_str_equal(doc.version, "2.34");

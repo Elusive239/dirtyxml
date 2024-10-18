@@ -1,6 +1,5 @@
 build
 docs
-resources
 lib
 scripts
 outtest[0-9]*.xml

@@ -137,7 +137,6 @@ fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocato
     allocator::free(allocator, file);
 }
 
-
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
     doc.root = new_node(null, allocator);
 
