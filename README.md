@@ -1,6 +1,6 @@
 # DXML
 Starting as a port of [littlexml](https://github.com/jonahisadev/littlexml) (originally written by 
-[jonahisadev](jonahisadev) in C) to [C3](https://c3-lang.org/) for personal reasons, dxml (Dirty-XML) 
+[jonahisadev](https://github.com/jonahisadev) in C) to [C3](https://c3-lang.org/) for personal reasons, dxml (Dirty-XML) 
 tries to be a slight improvement on littlexml by making use of C3s' features and standard library
 (using helpful things like C3s builtin Allocators, Strings, Interfaces, Faults, Methods, etc)!  
 
