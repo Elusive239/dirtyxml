@@ -4,8 +4,7 @@ import dxml;
 fn void! stream_example(){
 	XMLDocument doc; defer doc.free();
 	File file = file::open("resources/test4.xml", "rb")!;
-	doc.load_from_stream(&file)!;
-	file.close()!;
+	doc.load_from_stream_and_close(&file)!;
 
 	// File file2 = file::open("outfile4.xml", "wb")!!;
 	// defer file2.close()!;
@@ -23,7 +22,7 @@ fn void main(String[] args)
 	@pool(){
 		foreach(filename : args[1..]){ //first arg is always name of executable i believe
 			XMLDocument* doc = mem::temp_new(XMLDocument);
-			doc.tload_file(filename)!!;
+			doc.load_file(filename, allocator::temp())!!;
 			io::printfn("%s", doc);
 		}
 	};

@@ -10,6 +10,7 @@ struct XMLDocument (Printable)
     XMLNode* root;
     String version;
     String encoding;
+    Allocator alloc;
 }
 
 struct XMLAttribute (Printable)
@@ -49,24 +50,24 @@ def XMLAttributeList = List(<XMLAttribute*>);
 
 //Free Memory
 
-fn void XMLDocument.free(&self, Allocator allocator = allocator::heap()){
-    if(self.encoding.len > 0) allocator::free(allocator, self.encoding);
-    if(self.version.len > 0) allocator::free(allocator, self.version);
-    if(self.root != null) self.root.free(allocator);
+fn void XMLDocument.free(&self){
+    if(self.encoding.len > 0) allocator::free(self.alloc, self.encoding);
+    if(self.version.len > 0) allocator::free(self.alloc, self.version);
+    if(self.root != null) self.root.free(self.alloc);
     self.root = null;
 }
 
-fn void XMLNode.free(&self, Allocator allocator = allocator::heap()){
+fn void XMLNode.free(&self, Allocator allocator){
     for(int i = 0; i < self.attributes.len(); i++) self.attributes[i].free(allocator);
     self.attributes.free();
-    for(int i = 0; i < self.children.len(); i++) self.children[i].free();
+    for(int i = 0; i < self.children.len(); i++) self.children[i].free(allocator);
     self.children.free();
     if(self.tag.len > 0) allocator::free(allocator, self.tag);
     if(self.inner_text.len > 0) allocator::free(allocator, self.inner_text);
     allocator::free(allocator, self);
 }
 
-fn void XMLAttribute.free(&self, Allocator allocator = allocator::heap()){
+fn void XMLAttribute.free(&self, Allocator allocator){
     if(self.key.len   != 0) allocator::free(allocator, self.key);
     if(self.value.len != 0) allocator::free(allocator, self.value);
     allocator::free(allocator, self);
@@ -74,7 +75,7 @@ fn void XMLAttribute.free(&self, Allocator allocator = allocator::heap()){
 
 // Helper Methods
 
-fn XMLNode* new_node(XMLNode* parent, Allocator allocator = allocator::heap()){
+fn XMLNode* new_node(XMLNode* parent, Allocator allocator){
     XMLNode* node   = (XMLNode*) allocator::calloc(allocator, XMLNode.sizeof);
     node.parent     = parent;
     node.tag        = "";
@@ -101,7 +102,7 @@ fn String XMLNode.try_get_attribute(XMLNode* node, String key){
     return "";
 }
 
-fn XMLNode*[] XMLNode.get_by_tag(XMLNode* node, String tag, Allocator allocator = allocator::heap()){
+fn XMLNode*[] XMLNode.get_by_tag(XMLNode* node, String tag, Allocator allocator){
     XMLNodeList list;
     list.new_init(allocator: allocator);
     defer list.free();
@@ -119,12 +120,17 @@ fn XMLNode* XMLNode.get_child(XMLNode* node, int index){
 
 // Load data to parse from [SOURCE] Methods
 
+macro void! XMLDocument.load_from_stream_and_close(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
+    doc.load_from_stream(stream, allocator)!;
+    stream.close()!;
+}
+
 fn void! XMLDocument.load_from_stream(XMLDocument* doc, InStream stream, Allocator allocator = allocator::heap()){
     usz len = io::available(stream)! ;
     char[] buffer = allocator::alloc_array(allocator, char, len);
+    defer allocator::free(allocator, buffer);
     io::read_all(stream, buffer)!;
-    doc.load(buffer)!;
-    allocator::free(allocator, buffer);
+    doc.load(buffer, allocator)!;
 }
 
 fn void! XMLDocument.load_from_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){
@@ -133,11 +139,12 @@ fn void! XMLDocument.load_from_path(XMLDocument* doc, Path path, Allocator alloc
 
 fn void! XMLDocument.load_file(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
     char[] file = file::load_new(path, allocator)!;
-    doc.load(file)!;
-    allocator::free(allocator, file);
+    defer allocator::free(allocator, file);
+    doc.load(file, allocator)!;
 }
 
 fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = allocator::heap()){
+    doc.alloc = allocator;
     doc.root = new_node(null, allocator);
 
     char[256] lex;
@@ -150,12 +157,12 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
         lex[lexi] = 0;
         if(!compare_buffer("<?xml", &lex, lexi)){
             lexi = 0;
-            XMLNode* desc = new_node(null, allocator);
-            desc.tag = ("?xml").copy(allocator);
-            parse_attributes(&lex, &lexi, file, &i, desc, allocator)!;
-            doc.version = desc.try_get_attribute("version").copy(allocator);
-            doc.encoding = desc.try_get_attribute("encoding").copy(allocator);
-            desc.free();
+            XMLNode* desc = new_node(null, doc.alloc);
+            desc.tag = ("?xml").copy(doc.alloc);
+            parse_attributes(&lex, &lexi, file, &i, desc, doc.alloc)!;
+            doc.version = desc.try_get_attribute("version").copy(doc.alloc);
+            doc.encoding = desc.try_get_attribute("encoding").copy(doc.alloc);
+            desc.free(doc.alloc);
         }
     }
     XMLNode* current = doc.root;
@@ -169,11 +176,8 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
                     return XMLError.TEXT_OUTSIDE_NODE?;
                 }
                 if(current.inner_text.len == 0){
-                    current.inner_text = copy_buffer(&lex, lexi, allocator);
+                    current.inner_text = copy_buffer(&lex, lexi, doc.alloc);
                 }
-
-                // current.inner_text = copy_buffer(&lex, lexi, allocator);
-                // io::printfn("WE GOT SOME TEXT: %s", current.inner_text);
                 lexi = 0;
             }
             
@@ -204,11 +208,11 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
             }
 
             //set current node
-            current = new_node(current, allocator);
+            current = new_node(current, doc.alloc);
 
             //start tag
             i++;
-            if( parse_attributes(&lex, &lexi, file, &i, current, allocator)! == TagType.TAG_INLINE){
+            if( parse_attributes(&lex, &lexi, file, &i, current, doc.alloc)! == TagType.TAG_INLINE){
                 current = current.parent;
                 i++;
                 continue;
@@ -216,7 +220,7 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
             
             lex[lexi] = 0;
             if( current.tag.len == 0){
-                current.tag = copy_buffer(&lex, lexi, allocator);
+                current.tag = copy_buffer(&lex, lexi, doc.alloc);
             }
             lexi = 0;
             i++;
@@ -231,26 +235,8 @@ fn void! XMLDocument.load(XMLDocument* doc, char[] file, Allocator allocator = a
         current = doc.root;
         doc.root = current.children[0];
         current.children.pop()!!;
-        current.free(allocator);
+        current.free(doc.alloc);
     }
-}
-
-//temporary allocator versions
-
-fn void! XMLDocument.tload_from_stream(XMLDocument* doc, InStream stream){
-    doc.load_from_stream(stream, allocator::temp())!;
-}
-
-fn void! XMLDocument.tload_from_path(XMLDocument* doc, Path path){
-    doc.load_from_path(path, allocator::temp())!;
-}
-
-fn void! XMLDocument.tload_file(XMLDocument* doc, String path){
-    doc.load_file(path, allocator::temp())!;
-}
-
-fn void! XMLDocument.tload(XMLDocument* doc, char[] file){
-    doc.load(file, allocator::temp())!;
 }
 
 fn bool! handle_comment(char[] lex, int* xlexi, char[] file, int* xi){
@@ -349,13 +335,13 @@ fn TagType! parse_attributes(char[] lex, int* xlexi, char[] file, int* xi, XMLNo
 // Save parsed data to [SOURCE] Methods
 
 fn void! XMLDocument.write_to_stream(XMLDocument* doc, OutStream stream, Allocator allocator = allocator::heap()){
-    String str = doc.to_string(allocator);
+    String str = doc.to_string(allocator == null ? doc.alloc : allocator );
     io::write_all(stream, str)!;
     str.free();
 }
 
 fn void! XMLDocument.write_to_file(XMLDocument* doc, String path, Allocator allocator = allocator::heap()){
-    String str = doc.to_string(allocator);
+    String str = doc.to_string(allocator == null ? doc.alloc : allocator);
     File file = file::open(path, "w")!;
     file.write(str)!;
     file.close()!;
@@ -363,7 +349,7 @@ fn void! XMLDocument.write_to_file(XMLDocument* doc, String path, Allocator allo
 }
 
 fn void! XMLDocument.write_to_path(XMLDocument* doc, Path path, Allocator allocator = allocator::heap()){
-    doc.write_to_file(path.str_view(), allocator)!;
+    doc.write_to_file(path.str_view(), allocator == null ? doc.alloc : allocator)!;
 }
 
 // Printable interface implementations
@@ -411,7 +397,6 @@ fn String XMLAttribute.to_string(XMLAttribute* attribute, Allocator allocator = 
 }
 
 fn void DString.append_node(DString* dstr, XMLNode* node, int tabs = 1){
-    const char TAB = '\t';
     for(int i =0; i < tabs - 1; i++) dstr.append_char(TAB);
     dstr.appendf("<%s", node.tag);
     dstr.append_tags(node);
@@ -433,7 +418,6 @@ macro void DString.append_tags(DString* dstr, XMLNode* node){
 }
 
 macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
-    const char TAB = '\t';
     String innerText = node.inner_text;//.trim(" \n\t\r\0");
     if(innerText.len > 0){
         dstr.appendfn(">");
@@ -445,7 +429,7 @@ macro void DString.append_inner_text(DString* dstr, XMLNode* node, int tabs){
 }
 
 module dxml @private;
-
+const char TAB = '\t';
 // Helper Macros
 
 macro String copy_buffer(char[] buffer, int len, Allocator allocator = allocator::heap()){
