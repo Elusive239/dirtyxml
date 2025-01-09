@@ -55,6 +55,7 @@ fn void XMLDocument.free(&self){
     if(self.version.len > 0) allocator::free(self.alloc, self.version);
     if(self.root != null) self.root.free(self.alloc);
     self.root = null;
+    self.alloc = null;
 }
 
 fn void XMLNode.free(&self, Allocator allocator){
@@ -94,7 +95,7 @@ fn String! XMLNode.get_attribute(XMLNode* node, String key){
     return XMLError.ATTRIBUTE_DOES_NOT_EXIST?;
 }
 
-fn String XMLNode.try_get_attribute(XMLNode* node, String key){
+macro String XMLNode.try_get_attribute(XMLNode* node, String key){
     String! str = node.get_attribute(key);
     if(try str){
         return str;
@@ -113,7 +114,7 @@ fn XMLNode*[] XMLNode.get_by_tag(XMLNode* node, String tag, Allocator allocator)
     return list.to_new_array(allocator: allocator);
 }
 
-fn XMLNode* XMLNode.get_child(XMLNode* node, int index){
+macro XMLNode* XMLNode.get_child(XMLNode* node, int index){
     // if(index > node.children.len()) return XMLError.CHILD_NODE_DOES_NOT_EXIST?;
     return node.children[index];
 }
